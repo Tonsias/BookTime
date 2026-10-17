@@ -11,6 +11,7 @@ import { Search } from './ui/Search'
 
 const book = sampleBook
 
+/** Hauptansicht: 3D-Szene mit Werkzeugleiste, Zeitregler, Fokus-Panel und Suche */
 function App() {
   const [view, setView] = useState<View>('raum')
   const [current, setCurrent] = useState(0)

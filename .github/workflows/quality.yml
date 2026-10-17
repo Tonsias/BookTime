@@ -1,0 +1,50 @@
+name: Code-Qualität
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dead-code:
+    name: Dead Code (knip)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check:dead -- --reporter markdown >> "$GITHUB_STEP_SUMMARY" || true
+      - run: npm run check:dead
+
+  duplicates:
+    name: Duplikate (jscpd)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check:dup
+      - if: always()
+        run: cat reports/jscpd/jscpd-report.md >> "$GITHUB_STEP_SUMMARY"
+
+  docs:
+    name: Inline-Dokumentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check:docs

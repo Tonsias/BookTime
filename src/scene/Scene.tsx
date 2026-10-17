@@ -23,6 +23,7 @@ const setCursor = (pointer: boolean) => () => {
   document.body.style.cursor = pointer ? 'pointer' : ''
 }
 
+/** 3D-Raum-Zeit-Würfel: Ebenen je Ereignis, Personen als Stränge, Orte als Ringe, Beziehungen als Kanten */
 export function Scene(props: SceneProps) {
   const { book, states, layout, current, view, selection, focus, onSelect, onJump } = props
   const selectedId = selection?.kind === 'entity' ? selection.id : null

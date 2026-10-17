@@ -20,7 +20,24 @@ wie möglich zwischen Orten, Personen, Zeit usw. wechseln können.
 npm run dev      # Dev-Server
 npm run build    # Typecheck + Produktions-Build
 npm run lint     # oxlint
+npm run check    # Lint + alle Qualitäts-Checks (siehe unten)
 ```
+
+## Qualitäts-Checks – Pflicht vor jedem Push
+
+**Vor jedem `git push` muss `npm run check` lokal fehlerfrei durchlaufen.** Schlägt ein Check fehl, wird
+nicht gepusht: erst beheben (bzw. bei einer Entscheidung nachfragen), dann erneut prüfen. Dieselben
+Checks laufen auf GitHub im Workflow `.github/workflows/quality.yml` (Push auf `main`, Pull Requests,
+manuell).
+
+| Check | Befehl | Regel |
+|---|---|---|
+| Dead Code | `npm run check:dead` (knip) | keine ungenutzten Dateien, Exporte, Typen oder Abhängigkeiten |
+| Duplikate | `npm run check:dup` (jscpd, `.jscpd.json`) | höchstens 3 % duplizierter Code in `src/` |
+| Inline-Doku | `npm run check:docs` (`scripts/check-docs.mjs`) | jeder Export hat JSDoc (100 %); Inline-Kommentare (`//`, `/* */`, ohne JSDoc) höchstens 5 % der Zeilen |
+
+Grenzwerte oder Regeln dieser Checks werden nicht eigenmächtig geändert oder umgangen (z. B. durch
+Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 
 ## Struktur
 

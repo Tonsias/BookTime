@@ -7,6 +7,7 @@ interface SearchProps {
   onJump: (index: number) => void
 }
 
+/** Suche über Personen, Orte und Ereignisse (Strg+K) */
 export function Search({ book, onSelect, onJump }: SearchProps) {
   const entityGroup = (kind: 'person' | 'place', group: string): SpotlightActionGroupData => ({
     group,

@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:dead": "knip",
+    "check:dup": "jscpd",
+    "check:docs": "node scripts/check-docs.mjs --min-exports=100 --max-inline-comments=5",
+    "check": "npm run lint && npm run check:dead && npm run check:dup && npm run check:docs"
   },
   "dependencies": {
     "@mantine/core": "^9.7.3",
@@ -25,6 +29,8 @@
     "@types/react-dom": "^19.2.7",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "jscpd": "^5.4.1",
+    "knip": "^6.41.0",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"

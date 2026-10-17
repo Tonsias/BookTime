@@ -1,5 +1,6 @@
 import type { Book } from './model'
 
+/** Beispielgeschichte für den Prototyp */
 export const sampleBook: Book = {
   title: 'Der Brief von Velmar',
   entities: [

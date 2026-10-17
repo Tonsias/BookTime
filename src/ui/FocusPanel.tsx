@@ -11,6 +11,7 @@ interface FocusPanelProps {
   onJump: (index: number) => void
 }
 
+/** Detailpanel zur Auswahl mit Stand, Verlauf und klickbaren Querverweisen */
 export function FocusPanel(props: FocusPanelProps) {
   const { book, selection, onSelect } = props
   const entity = selection.kind === 'entity' ? book.entities.find((e) => e.id === selection.id) : undefined

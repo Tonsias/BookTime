@@ -1,7 +1,9 @@
 import { Vector3 } from 'three'
 import type { Book, SliceState } from '../model'
 
+/** Abstand zwischen zwei Ereignis-Ebenen auf der Zeitachse */
 export const SLICE_SPACING = 8
+/** Kantenlänge einer Ereignis-Ebene */
 export const LAYER_SIZE = 22
 
 const PERSON_RADIUS = 1.3
@@ -9,17 +11,20 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5))
 /** Wie lange ein Strang an einer Ebene gerade bleibt, bevor er sich zur nächsten biegt */
 const HOLD = SLICE_SPACING * 0.3
 
+/** Position im 2D-Netz [u, v] */
 export type NetPos = [number, number]
 
 /** Zeit läuft entlang x, das Netz liegt in der y/z-Ebene */
 export const slicePoint = (slice: number, [u, v]: NetPos) => new Vector3(slice * SLICE_SPACING, v, u)
 
+/** Positionen aller Orte und Personen im Netz */
 export interface Layout {
   places: Map<string, NetPos>
   /** Position jeder Person pro Ereignis, null wenn nicht anwesend */
   persons: Map<string, (NetPos | null)[]>
 }
 
+/** Ordnet Orte fest an und Personen um ihren jeweiligen Ort, je Ereignis */
 export function computeLayout(book: Book, states: SliceState[]): Layout {
   const places = new Map<string, NetPos>()
   for (const e of book.entities) if (e.kind === 'place') places.set(e.id, e.position ?? [0, 0])

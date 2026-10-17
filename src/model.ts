@@ -1,5 +1,7 @@
+/** Art einer Beziehung zwischen zwei Personen */
 export type RelationKind = 'freund' | 'liebe' | 'verbündet' | 'misstrauen' | 'feind'
 
+/** Farbe jeder Beziehungsart in Szene und Legende */
 export const RELATION_COLORS: Record<RelationKind, string> = {
   freund: '#4ade80',
   liebe: '#f472b6',
@@ -8,6 +10,7 @@ export const RELATION_COLORS: Record<RelationKind, string> = {
   feind: '#ef4444',
 }
 
+/** Person oder Ort der Geschichte */
 export interface Entity {
   id: string
   kind: 'person' | 'place'
@@ -18,6 +21,7 @@ export interface Entity {
   position?: [number, number]
 }
 
+/** Eine Änderung, die ein Ereignis an der Welt vornimmt */
 export type Change =
   | { type: 'appear'; entity: string; at: string; note?: string }
   | { type: 'move'; entity: string; to: string; note?: string }
@@ -27,20 +31,21 @@ export type Change =
   | { type: 'relation'; a: string; b: string; kind: RelationKind | null; note?: string }
   | { type: 'mood'; entity: string; mood: string; note?: string }
 
-export interface StoryEvent {
+interface StoryEvent {
   id: string
   title: string
   description: string
   changes: Change[]
 }
 
+/** Ein ganzes Buch: alle Elemente und die Ereignisse in zeitlicher Reihenfolge */
 export interface Book {
   title: string
   entities: Entity[]
   events: StoryEvent[]
 }
 
-export interface Relation {
+interface Relation {
   a: string
   b: string
   kind: RelationKind
@@ -54,12 +59,15 @@ export interface SliceState {
   exiting: string[]
 }
 
+/** Kamera-Ansicht der 3D-Szene */
 export type View = 'raum' | 'netz' | 'zeit'
 
+/** Aktuell ausgewähltes Element oder Ereignis */
 export type Selection = { kind: 'entity'; id: string } | { kind: 'event'; id: string }
 
 const relationKey = (a: string, b: string) => [a, b].sort().join('|')
 
+/** Wendet die Änderungen aller Ereignisse nacheinander an und liefert den Zustand nach jedem Ereignis */
 export function computeStates(book: Book): SliceState[] {
   const location: Record<string, string> = {}
   const mood: Record<string, string> = {}
@@ -102,6 +110,7 @@ export function computeStates(book: Book): SliceState[] {
   })
 }
 
+/** IDs aller Elemente, die eine Änderung betrifft */
 export function involvedIds(c: Change): string[] {
   switch (c.type) {
     case 'appear':
