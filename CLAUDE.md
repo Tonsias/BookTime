@@ -34,7 +34,10 @@ manuell).
 |---|---|---|
 | Dead Code | `npm run check:dead` (knip) | keine ungenutzten Dateien, Exporte, Typen oder Abhängigkeiten |
 | Duplikate | `npm run check:dup` (jscpd, `.jscpd.json`) | höchstens 3 % duplizierter Code in `src/` |
-| Inline-Doku | `npm run check:docs` (`scripts/check-docs.mjs`) | jeder Export hat JSDoc (100 %); Inline-Kommentare (`//`, `/* */`, ohne JSDoc) höchstens 5 % der Zeilen |
+| Doku | `npm run check:docs` (`scripts/check-docs.mjs`) | jeder Export hat JSDoc (100 %); alle Kommentare inkl. JSDoc höchstens 5 % der Zeilen |
+
+Dokumentation bewusst minimal halten: JSDoc möglichst einzeilig und nur das Warum/Was, das der Name
+nicht schon sagt; Inline-Kommentare nur, wo der Code allein nicht verständlich ist.
 
 Grenzwerte oder Regeln dieser Checks werden nicht eigenmächtig geändert oder umgangen (z. B. durch
 Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.

@@ -1,6 +1,6 @@
 # Vorschlag: Code-Qualitäts-Workflows
 
-Status: **freigegeben und umgesetzt** – knip + jscpd; Doku: Exporte 100 % JSDoc, Inline-Kommentare ≤ 5 %; Fehlschlagen bei Verstoß; Auslöser Push, PR, manuell
+Status: **freigegeben und umgesetzt** – knip + jscpd; Doku: Exporte 100 % JSDoc, alle Kommentare inkl. JSDoc ≤ 5 %; Fehlschlagen bei Verstoß; Auslöser Push, PR, manuell
 
 Ziel: automatische Prüfung auf toten Code, duplizierten Code und den Anteil an Inline-Dokumentation.
 
