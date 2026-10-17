@@ -1,0 +1,105 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.app {
+  position: relative;
+  height: 100%;
+  background: #0b0d12;
+}
+
+.overlay {
+  position: absolute;
+  z-index: 20;
+  background: rgba(20, 22, 30, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+.toolbar {
+  top: 16px;
+  left: 16px;
+  width: 280px;
+}
+
+.timebar {
+  left: 50%;
+  bottom: 16px;
+  width: min(640px, calc(100% - 32px));
+  transform: translateX(-50%);
+}
+
+.focus-panel {
+  top: 16px;
+  right: 16px;
+  width: min(360px, calc(100% - 32px));
+}
+
+.focus-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.scene-label,
+.layer-label {
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 6px;
+  background: rgba(11, 13, 18, 0.8);
+  transition: opacity 0.2s;
+}
+
+.scene-label {
+  padding: 1px 7px;
+  font-size: 11px;
+  border: 1px solid;
+}
+
+.scene-label.strong {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.layer-label {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #8b93a7;
+  border: 1px solid #3a4152;
+}
+
+.layer-label.active {
+  color: #fff;
+  border-color: #6b8cff;
+  background: rgba(107, 140, 255, 0.25);
+}
+
+@media (max-width: 700px) {
+  .toolbar {
+    width: auto;
+    right: 16px;
+  }
+  .focus-panel {
+    top: auto;
+    bottom: 150px;
+  }
+}
