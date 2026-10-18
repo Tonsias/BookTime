@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, type ComponentRef } from 'react'
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
-import { CameraControls, Edges, Html, Line } from '@react-three/drei'
-import { DoubleSide, Plane, Quaternion, Vector3 } from 'three'
+import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef, type ReactNode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { CameraControls, Edges, Line } from '@react-three/drei'
+import { DoubleSide, Group, Plane, Quaternion, Vector3 } from 'three'
 import { covers, elementColor, factsAt, phaseAt, type Book, type Selection, type TimePoint, type View } from '../model'
 import { LAYER_SIZE, SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
 
@@ -216,7 +217,7 @@ function Layer(props: { index: number; title: string; active: boolean; opacity: 
         <meshBasicMaterial color={active ? '#6b8cff' : '#ffffff'} transparent opacity={(active ? 0.07 : 0.025) * opacity} side={DoubleSide} depthWrite={false} />
         <Edges color={active ? '#6b8cff' : '#3a4152'} />
       </mesh>
-      <Html position={[0, LAYER_SIZE / 2 + 1, 0]} center zIndexRange={[10, 0]} style={{ opacity }}>
+      <Html position={[0, LAYER_SIZE / 2 + 1, 0]} opacity={opacity}>
         <button type="button" className={`layer-label${active ? ' active' : ''}`} onClick={() => onJump(index)}>
           {index + 1}. {title}
         </button>
@@ -267,10 +268,49 @@ function Arrowhead({ from, to, color, opacity }: { from: Vector3; to: Vector3; c
 function Label(props: { position: Vector3; color: string; dim: boolean; strong?: boolean; onClick: () => void; children: React.ReactNode }) {
   const { position, color, dim, strong, onClick, children } = props
   return (
-    <Html position={position} center zIndexRange={[10, 0]}>
+    <Html position={position}>
       <button type="button" className={`scene-label${strong ? ' strong' : ''}`} style={{ borderColor: color, color, opacity: dim ? 0.3 : 1 }} onClick={onClick}>
         {children}
       </button>
     </Html>
   )
+}
+
+const projected = new Vector3()
+
+/** Wie drei-Html, baut sein React-Root aber erst nach dem Commit ab – synchrones unmount löst eine React-Warnung aus */
+function Html({ position, opacity = 1, children }: { position: Vector3 | [number, number, number]; opacity?: number; children: ReactNode }) {
+  const group = useRef<Group>(null)
+  const { gl, camera, size } = useThree()
+  const el = useRef<HTMLDivElement | null>(null)
+  const root = useRef<Root | null>(null)
+
+  useLayoutEffect(() => {
+    const target = gl.domElement.parentNode!
+    const div = document.createElement('div')
+    div.style.cssText = 'position:absolute;top:0;left:0;'
+    target.appendChild(div)
+    el.current = div
+    const current = (root.current = createRoot(div))
+    return () => {
+      target.removeChild(div)
+      el.current = root.current = null
+      setTimeout(() => current.unmount())
+    }
+  }, [gl])
+
+  useLayoutEffect(() => {
+    root.current?.render(<div style={{ transform: 'translate3d(-50%,-50%,0)', opacity }}>{children}</div>)
+  })
+
+  useFrame(() => {
+    const div = el.current
+    if (!group.current || !div) return
+    group.current.getWorldPosition(projected).project(camera)
+    div.style.display = projected.z > 1 ? 'none' : ''
+    div.style.zIndex = String(Math.round((1 - projected.z) * 5))
+    div.style.transform = `translate3d(${((projected.x + 1) / 2) * size.width}px,${((1 - projected.y) / 2) * size.height}px,0)`
+  })
+
+  return <group ref={group} position={position} />
 }
