@@ -36,8 +36,8 @@ npm run build    # Typecheck + Produktions-Build nach dist/
 npm run check    # Lint, Dead Code, Duplikate, Doku – muss vor jedem Push fehlerfrei laufen
 ```
 
-`three` ist auf 0.182.x festgelegt, bis `@react-three/fiber` auf `THREE.Timer` umstellt; ab r183 meldet three
-sonst eine Deprecation-Warnung.
+Bekannte, bewusst akzeptierte Konsolenmeldung: `THREE.Clock: This module has been deprecated` kommt aus
+`@react-three/fiber` und verschwindet, sobald fiber auf `THREE.Timer` umstellt.
 
 Deployment auf GitHub Pages läuft automatisch per GitHub Actions bei jedem Push auf `main`, die
 Qualitäts-Checks laufen zusätzlich bei Pull Requests.
