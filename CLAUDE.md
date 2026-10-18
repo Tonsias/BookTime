@@ -44,10 +44,13 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 
 ## Struktur
 
-- `src/model.ts` – Datentypen (Entity, StoryEvent, Change) und Zustandsberechnung pro Ereignis
+- `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
+  Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`)
 - `src/sampleBook.ts` – Beispieldaten
+- `src/colors.ts` – Anzeigefarben der Elemente
 - `src/scene/` – 3D-Szene und Layout (Zeit = x-Achse, Netz = y/z-Ebene)
 - `src/ui/` – Mantine-Oberfläche (Fokus-Panel, Suche)
+- `docs/` – akzeptierte Vorschläge
 
 ## Entscheidungen: immer nachfragen
 
@@ -74,9 +77,11 @@ Vorschläge werden nicht nur in Textform gemacht, sondern sichtbar:
 - **UI / Interaktion:** ein eigenständiger HTML-Prototyp, der im Browser geöffnet werden kann und zeigt,
   wie es aussehen und sich anfühlen soll
 
-Vorschläge liegen in `docs/proposals/` (z. B. `docs/proposals/2026-10-datenmodell.md`,
-`docs/proposals/2026-10-editor.html`). Jeder Vorschlag nennt, was entschieden werden muss, deine
-Empfehlung mit Begründung und die verworfenen Alternativen. Erst nach Freigabe wird umgesetzt.
+Entwürfe von Vorschlägen kommen nicht ins Repo, sondern nach `C:\Users\tobia\Downloads\` (z. B.
+`2026-10-datenmodell.md`, `2026-10-editor.html`). Erst ein **akzeptierter** Vorschlag wird unter `docs/`
+abgelegt und mit der Umsetzung committet. Alle offenen Fragen werden **vor** dem
+Vorschlag per Rückfrage geklärt. Ein Vorschlag enthält keine offenen Fragen. Er nennt die Festlegungen mit
+Begründung und die verworfenen Alternativen. Erst nach Freigabe wird umgesetzt.
 
 ## Sprache
 
