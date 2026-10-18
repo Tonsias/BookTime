@@ -47,7 +47,6 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 - `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
   Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`)
 - `src/sampleBook.ts` – Beispieldaten
-- `src/colors.ts` – Anzeigefarben der Elemente
 - `src/scene/` – 3D-Szene und Layout (Zeit = x-Achse, Netz = y/z-Ebene)
 - `src/ui/` – Mantine-Oberfläche (Fokus-Panel, Suche)
 - `docs/` – akzeptierte Vorschläge

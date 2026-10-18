@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, type ComponentRef } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Edges, Html, Line } from '@react-three/drei'
 import { DoubleSide, Plane, Quaternion, Vector3 } from 'three'
-import { EVENT_COLOR, elementColor } from '../colors'
-import { covers, factsAt, phaseAt, type Book, type Selection, type TimePoint, type View } from '../model'
+import { covers, elementColor, factsAt, phaseAt, type Book, type Selection, type TimePoint, type View } from '../model'
 import { LAYER_SIZE, SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
 
 interface SceneProps {
@@ -109,7 +108,7 @@ export function Scene(props: SceneProps) {
           return (
             <mesh key={`${event.id}-${i}`} position={slicePoint(i, pos)} onClick={select('event', event.id)} onPointerOver={setCursor(true)} onPointerOut={setCursor(false)}>
               <octahedronGeometry args={[i === current ? 0.5 : 0.32]} />
-              <meshStandardMaterial color={EVENT_COLOR} emissive={EVENT_COLOR} emissiveIntensity={0.4} transparent opacity={emphasis(event.id) * sliceOpacity(i)} />
+              <meshStandardMaterial color={event.color} emissive={event.color} emissiveIntensity={0.4} transparent opacity={emphasis(event.id) * sliceOpacity(i)} />
             </mesh>
           )
         }),
@@ -146,10 +145,12 @@ export function Scene(props: SceneProps) {
       {book.places.map((place) => {
         const pos = layout.places.get(place.id)![current]
         if (!pos) return null
+        // Unterorte oben beschriften, sonst überdeckt ihr Label das des Elternorts
+        const above = !!phaseAt(book, place.phases, current)?.parent
         return (
           <Label
             key={place.id}
-            position={slicePoint(current, [pos[0], pos[1] - ringRadius(place) - 0.5])}
+            position={slicePoint(current, [pos[0], pos[1] + (above ? 1 : -1) * (ringRadius(place) + 0.5)])}
             color={color(place.id)}
             dim={emphasis(place.id) < 0.5}
             onClick={() => onSelect({ kind: 'place', id: place.id })}

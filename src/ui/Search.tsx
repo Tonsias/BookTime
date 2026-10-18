@@ -1,6 +1,5 @@
 import { Spotlight, type SpotlightActionGroupData } from '@mantine/spotlight'
-import { elementColor } from '../colors'
-import { bounds, type Book, type ElementKind, type Selection, type TimePoint } from '../model'
+import { bounds, elementColor, type Book, type ElementKind, type Selection, type TimePoint } from '../model'
 
 interface SearchProps {
   book: Book

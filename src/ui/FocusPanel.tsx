@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { Anchor, Badge, Box, CloseButton, Group, Image, Paper, ScrollArea, Stack, Text, Timeline, Title } from '@mantine/core'
-import { elementColor } from '../colors'
 import {
   bounds,
+  elementColor,
   factTiming,
   factsAt,
   findElement,
@@ -184,7 +184,9 @@ function FactText(props: FocusPanelProps & { fact: Fact; phase?: RelationPhase }
   const note = phase?.note ?? fact.note
   return (
     <div>
-      <Text size="sm">{text}</Text>
+      <Text size="sm" component="div">
+        {text}
+      </Text>
       {note && (
         <Text size="xs" c="dimmed" fs="italic">
           {note}

@@ -55,6 +55,7 @@ classDiagram
         id
         name
         description
+        color
         existence : Timing
         note
     }
@@ -62,6 +63,7 @@ classDiagram
         id
         name
         description
+        color
         existence : Timing
         note
     }
@@ -69,6 +71,7 @@ classDiagram
         id
         name
         description
+        color
         radius – optional
         existence : Timing
         note
@@ -84,6 +87,7 @@ classDiagram
         id
         title
         description
+        color
         timing : Timing
         result
         note
@@ -440,6 +444,7 @@ classDiagram
 | Alles zu Zeitpunkt oder Zeitspanne | `Timing` an jedem Ding, jedem zeitlichen Fakt und jeder Phase (Festlegung 2) |
 | Personen, Gruppen, Orte, Orts-Phasen und Events haben Bilder | `Image`, mehrere pro Element, optional zeitlich begrenzt (Festlegung 11) |
 | Jede Klasse hat eine zeitunabhängige Notiz | `note` in Markdown an jeder Klasse (Festlegung 12) |
+| Personen, Gruppen, Orte und Events haben eine Farbe | `color`, Pflichtfeld, zeitunabhängig (Festlegung 15) |
 
 ### Skizze in TypeScript
 
@@ -450,11 +455,11 @@ type Timing = { at: string } | { from?: string; to?: string }
 interface TimePoint { id: string; name: string; dateLabel?: string; order: number; note?: string }
 interface Image { id: string; file: string; order: number; timing?: Timing; note?: string }
 
-interface Person { id: string; name: string; description: string; existence: Timing; images: Image[]; note?: string }
-interface Group { id: string; name: string; description: string; existence: Timing; images: Image[]; note?: string }
+interface Person { id: string; name: string; description: string; color: string; existence: Timing; images: Image[]; note?: string }
+interface Group { id: string; name: string; description: string; color: string; existence: Timing; images: Image[]; note?: string }
 interface PlacePhase { id: string; timing: Timing; parent?: string; x: number; y: number; images: Image[]; note?: string }
-interface Place { id: string; name: string; description: string; radius?: number; existence: Timing; phases: PlacePhase[]; images: Image[]; note?: string }
-interface Event { id: string; title: string; description: string; timing: Timing; place?: string; result: string; images: Image[]; note?: string }
+interface Place { id: string; name: string; description: string; color: string; radius?: number; existence: Timing; phases: PlacePhase[]; images: Image[]; note?: string }
+interface Event { id: string; title: string; description: string; color: string; timing: Timing; place?: string; result: string; images: Image[]; note?: string }
 
 interface RelationType { id: string; name: string; category: string; directed: boolean; inverseName?: string; color: string; note?: string }
 interface RelationPhase { id: string; timing: Timing; type: string; strength: 1 | 2 | 3 | 4 | 5; causedBy?: string; note?: string }
@@ -757,6 +762,19 @@ Verhindert beim Bearbeiten, weil das Modell sonst keine eindeutige Antwort liefe
 | **Hinweise, Verbote nur bei Uneindeutigkeit** (festgelegt) | Man kann unfertig planen, und das Modell bleibt trotzdem auswertbar. |
 | Alle Widersprüche verbieten | Verworfen: Unfertige oder bewusst widersprüchliche Planung wäre blockiert. |
 | Gar nicht prüfen | Verworfen: Widersprüche blieben unbemerkt. |
+
+## Festlegung 15: Farben
+
+Person, Gruppe, Ort und Event haben je eine Farbe (`color`, Hex-Wert wie `#38bdf8`). Sie ist ein
+**Pflichtfeld** und **zeitunabhängig**: Sie dient dem Wiedererkennen und bleibt über die ganze Geschichte
+gleich. Beim Anlegen wird eine Farbe aus einer Palette vorgeschlagen.
+
+| Option | Bewertung |
+|---|---|
+| **Pflichtfeld, zeitunabhängig, auch an Events** (festgelegt) | Jedes Element ist überall in derselben, selbst gewählten Farbe erkennbar. |
+| Optional, sonst automatisch aus einer Palette | Verworfen: Die Farbe hinge von der Reihenfolge im Buch ab und könnte sich beim Einfügen ändern. |
+| Farbe in Phasen, zeitabhängig | Verworfen: Ein Element wäre über die Zeit schwerer wiederzuerkennen. |
+| Einheitliche Farbe für alle Events | Verworfen: Events sollen sich farblich unterscheiden lassen. |
 
 ## Nicht Teil dieser Freigabe
 

@@ -22,6 +22,7 @@ export interface Image {
 interface Element {
   id: string
   description: string
+  color: string
   images: Image[]
   note?: string
 }
@@ -284,3 +285,6 @@ export function focusSet(book: Book, selection: Selection | null): Set<string> |
   if (event?.place) ids.add(event.place)
   return ids
 }
+
+/** Farbe eines Elements, gesucht über die ID */
+export const elementColor = (book: Book, id: string) => findElement(book, id)?.element.color ?? '#888888'
