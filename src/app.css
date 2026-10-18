@@ -103,3 +103,10 @@ body,
     bottom: 150px;
   }
 }
+
+.image-placeholder {
+  padding: 18px;
+  border: 1px dashed #3a4152;
+  border-radius: 6px;
+  text-align: center;
+}

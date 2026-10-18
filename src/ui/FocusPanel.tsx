@@ -1,194 +1,241 @@
 import type { ReactNode } from 'react'
-import { Anchor, Badge, CloseButton, Group, Paper, ScrollArea, Stack, Text, Timeline, Title } from '@mantine/core'
-import { RELATION_COLORS, involvedIds, type Book, type Change, type Entity, type Selection, type SliceState } from '../model'
+import { Anchor, Badge, Box, CloseButton, Group, Image, Paper, ScrollArea, Stack, Text, Timeline, Title } from '@mantine/core'
+import { elementColor } from '../colors'
+import {
+  bounds,
+  factTiming,
+  factsAt,
+  findElement,
+  imageAt,
+  involvedIds,
+  placeChain,
+  phaseAt,
+  type Book,
+  type ElementKind,
+  type Fact,
+  type RelationPhase,
+  type Relation,
+  type Selection,
+  type StoryEvent,
+  type TimePoint,
+  type Timing,
+} from '../model'
 
 interface FocusPanelProps {
   book: Book
-  states: SliceState[]
+  points: TimePoint[]
   current: number
   selection: Selection
   onSelect: (selection: Selection | null) => void
   onJump: (index: number) => void
 }
 
+const KIND_LABELS: Record<ElementKind, string> = { person: 'Person', group: 'Gruppe', place: 'Ort', event: 'Event' }
+
+type Entry = { fact: Fact; phase?: RelationPhase; start: number }
+
+const entries = (book: Book, keep: (fact: Fact, phase: RelationPhase | undefined, start: number) => boolean): Entry[] =>
+  book.facts
+    .flatMap<Entry>((fact) =>
+      fact.kind === 'relation'
+        ? fact.phases.map((phase) => ({ fact, phase, start: bounds(book, phase.timing)[0] }))
+        : [{ fact, start: bounds(book, factTiming(book, fact))[0] }],
+    )
+    .filter((e) => keep(e.fact, e.phase, e.start))
+    .sort((a, b) => a.start - b.start)
+
 /** Detailpanel zur Auswahl mit Stand, Verlauf und klickbaren Querverweisen */
 export function FocusPanel(props: FocusPanelProps) {
-  const { book, selection, onSelect } = props
-  const entity = selection.kind === 'entity' ? book.entities.find((e) => e.id === selection.id) : undefined
-  const eventIndex = selection.kind === 'event' ? book.events.findIndex((e) => e.id === selection.id) : -1
+  const { book, current, selection, onSelect } = props
+  const found = findElement(book, selection.id)
+  if (!found) return null
+  const image = imageAt(book, selection.id, current)
 
   return (
     <Paper className="overlay focus-panel" radius="md" withBorder shadow="lg">
       <CloseButton className="focus-close" onClick={() => onSelect(null)} aria-label="Schließen" />
       <ScrollArea.Autosize mah="calc(100vh - 220px)" p="md">
-        {entity && <EntityDetails {...props} entity={entity} />}
-        {eventIndex >= 0 && <EventDetails {...props} index={eventIndex} />}
+        <Stack gap="md">
+          <div>
+            <Group gap="xs">
+              <span className="dot" style={{ background: elementColor(book, selection.id) }} />
+              <Title order={3}>{found.label}</Title>
+              <Badge variant="light" color="gray">
+                {KIND_LABELS[found.kind]}
+              </Badge>
+            </Group>
+            <Markdown dimmed>{found.element.description}</Markdown>
+          </div>
+          {image ? (
+            <Image src={image.file} radius="sm" alt={found.label} />
+          ) : (
+            <Box className="image-placeholder">
+              <Text size="xs" c="dimmed">
+                Kein Bild zu diesem Zeitpunkt
+              </Text>
+            </Box>
+          )}
+          {found.kind === 'event' ? <EventDetails {...props} event={found.element as StoryEvent} /> : <ElementDetails {...props} kind={found.kind} />}
+          {found.element.note && (
+            <Section title="Notiz">
+              <Markdown>{found.element.note}</Markdown>
+            </Section>
+          )}
+        </Stack>
       </ScrollArea.Autosize>
     </Paper>
   )
 }
 
-function EntityDetails(props: FocusPanelProps & { entity: Entity }) {
-  const { book, states, current, entity, onSelect, onJump } = props
-  const state = states[current]
-  const ref = (id: string) => <Ref book={book} id={id} onSelect={onSelect} />
+function ElementDetails(props: FocusPanelProps & { kind: ElementKind }) {
+  const { book, points, current, selection, kind, onJump } = props
+  const id = selection.id
+  // Wer in einem Unterort ist, ist auch im Ort selbst
+  const involves = (fact: Fact, i: number) =>
+    involvedIds(fact).includes(id) || (kind === 'place' && fact.kind === 'stay' && placeChain(book, fact.place, i).some((p) => p.id === id))
 
-  const history = book.events
-    .map((event, index) => ({ event, index, changes: event.changes.filter((c) => involvedIds(c).includes(entity.id)) }))
-    .filter((h) => h.changes.length > 0)
-  const active = history.filter((h) => h.index <= current).length - 1
+  const now = factsAt(book, current).filter((f) => involves(f, current))
+  const history = entries(book, (fact, _phase, start) => involves(fact, start))
+  const active = history.filter((h) => h.start <= current).length - 1
 
   return (
-    <Stack gap="md">
-      <div>
-        <Group gap="xs">
-          <span className="dot" style={{ background: entity.color }} />
-          <Title order={3}>{entity.name}</Title>
-          <Badge variant="light" color="gray">
-            {entity.kind === 'person' ? 'Person' : 'Ort'}
-          </Badge>
-        </Group>
-        <Text size="sm" c="dimmed" mt={4}>
-          {entity.description}
-        </Text>
-      </div>
-
-      <Section title={`Stand: ${current + 1}. ${book.events[current].title}`}>
-        {entity.kind === 'person' ? (
-          state.location[entity.id] ? (
-            <Stack gap={6}>
-              <Row label="Ort">{ref(state.location[entity.id])}</Row>
-              <Row label="Gefühl">{state.mood[entity.id] ?? '–'}</Row>
-              <Row label="Beziehungen">
-                <Stack gap={4}>
-                  {state.relations
-                    .filter((r) => r.a === entity.id || r.b === entity.id)
-                    .map((r) => (
-                      <Group key={r.a + r.b} gap={6}>
-                        {ref(r.a === entity.id ? r.b : r.a)}
-                        <Badge size="xs" variant="outline" color={RELATION_COLORS[r.kind]}>
-                          {r.kind}
-                        </Badge>
-                      </Group>
-                    ))}
-                </Stack>
-              </Row>
-            </Stack>
-          ) : (
-            <Text size="sm" c="dimmed">
-              Zu diesem Zeitpunkt nicht in der Geschichte.
-            </Text>
-          )
+    <>
+      <Section title={`Stand: ${current + 1}. ${points[current].name}`}>
+        {now.length ? (
+          <Stack gap={6}>
+            {now.map((fact) => (
+              <FactText key={fact.id} {...props} fact={fact} phase={fact.kind === 'relation' ? phaseAt(book, fact.phases, current) : undefined} />
+            ))}
+          </Stack>
         ) : (
-          <Row label="Anwesend">
-            <Group gap={8}>
-              {Object.entries(state.location)
-                .filter(([, place]) => place === entity.id)
-                .map(([person]) => (
-                  <span key={person}>{ref(person)}</span>
-                ))}
-            </Group>
-          </Row>
+          <Text size="sm" c="dimmed">
+            Zu diesem Zeitpunkt nichts verknüpft.
+          </Text>
         )}
       </Section>
 
       <Section title="Verlauf">
         <Timeline active={active} bulletSize={16} lineWidth={2}>
-          {history.map(({ event, index, changes }) => (
-            <Timeline.Item
-              key={event.id}
-              title={
-                <Anchor component="button" type="button" fw={600} size="sm" onClick={() => onJump(index)}>
-                  {index + 1}. {event.title}
-                </Anchor>
-              }
-            >
-              {changes.map((c, k) => (
-                <ChangeText key={k} book={book} change={c} onSelect={onSelect} />
-              ))}
+          {history.map(({ fact, phase }) => (
+            <Timeline.Item key={phase?.id ?? fact.id} title={<TimingLink book={book} timing={phase?.timing ?? factTiming(book, fact)} onJump={onJump} />}>
+              <FactText {...props} fact={fact} phase={phase} />
             </Timeline.Item>
           ))}
         </Timeline>
       </Section>
-    </Stack>
+    </>
   )
 }
 
-function EventDetails(props: FocusPanelProps & { index: number }) {
-  const { book, index, onSelect } = props
-  const event = book.events[index]
+function EventDetails(props: FocusPanelProps & { event: StoryEvent }) {
+  const { book, event, onJump } = props
+  const ref = (id: string) => <Ref {...props} id={id} />
+  const participants = book.facts.filter((f) => f.kind === 'participation' && f.event === event.id)
+  const caused = entries(book, (fact, phase) => (phase ?? (fact as { causedBy?: string })).causedBy === event.id)
+
   return (
-    <Stack gap="md">
-      <div>
-        <Badge variant="light">Ereignis {index + 1}</Badge>
-        <Title order={3} mt={6}>
-          {event.title}
-        </Title>
-        <Text size="sm" c="dimmed" mt={4}>
-          {event.description}
-        </Text>
-      </div>
-      <Section title="Änderungen">
-        <Stack gap={8}>
-          {event.changes.map((c, k) => (
-            <ChangeText key={k} book={book} change={c} onSelect={onSelect} />
+    <>
+      <Stack gap={6}>
+        <Row label="Zeit">
+          <TimingLink book={book} timing={event.timing} onJump={onJump} />
+        </Row>
+        <Row label="Ort">{event.place ? ref(event.place) : '–'}</Row>
+      </Stack>
+      <Section title="Beteiligt">
+        <Stack gap={4}>
+          {participants.map((f) => (
+            <FactText key={f.id} {...props} fact={f} />
           ))}
         </Stack>
       </Section>
-    </Stack>
+      <Section title="Ergebnis">
+        <Markdown>{event.result}</Markdown>
+        <Stack gap={4} mt={6}>
+          {caused.map(({ fact, phase }) => (
+            <FactText key={phase?.id ?? fact.id} {...props} fact={fact} phase={phase} />
+          ))}
+        </Stack>
+      </Section>
+    </>
   )
 }
 
-function ChangeText({ book, change: c, onSelect }: { book: Book; change: Change; onSelect: (s: Selection) => void }) {
-  const ref = (id: string) => <Ref book={book} id={id} onSelect={onSelect} />
+function FactText(props: FocusPanelProps & { fact: Fact; phase?: RelationPhase }) {
+  const { fact, phase } = props
+  const ref = (id: string) => <Ref {...props} id={id} />
   let text: ReactNode
-  switch (c.type) {
-    case 'appear':
-      text = <>{ref(c.entity)} taucht auf in {ref(c.at)}</>
+  switch (fact.kind) {
+    case 'stay':
+      text = <>{ref(fact.person)} in {ref(fact.place)}</>
       break
-    case 'move':
-      text = <>{ref(c.entity)} → {ref(c.to)}</>
+    case 'journey':
+      text = <>{ref(fact.person)} unterwegs {ref(fact.origin)} → {ref(fact.destination)}</>
       break
-    case 'exit':
-      text = <>{ref(c.entity)} verlässt die Geschichte</>
+    case 'participation':
+      text = <>{ref(fact.actor)} bei {ref(fact.event)}{fact.role && ` (${fact.role})`}</>
       break
-    case 'mood':
-      text = <>{ref(c.entity)} fühlt sich {c.mood}</>
+    case 'membership':
+      text = <>{ref(fact.person)} in {ref(fact.group)}{fact.role && ` (${fact.role})`}</>
       break
     case 'relation':
-      text = (
-        <>
-          {ref(c.a)} ↔ {ref(c.b)}:{' '}
-          {c.kind ? (
-            <Badge size="xs" variant="outline" color={RELATION_COLORS[c.kind]}>
-              {c.kind}
-            </Badge>
-          ) : (
-            'Beziehung endet'
-          )}
-        </>
-      )
+      text = <RelationText {...props} relation={fact} phase={phase} />
       break
   }
+  const note = phase?.note ?? fact.note
   return (
     <div>
       <Text size="sm">{text}</Text>
-      {c.note && (
+      {note && (
         <Text size="xs" c="dimmed" fs="italic">
-          {c.note}
+          {note}
         </Text>
       )}
     </div>
   )
 }
 
-function Ref({ book, id, onSelect }: { book: Book; id: string; onSelect: (s: Selection) => void }) {
-  const entity = book.entities.find((e) => e.id === id)
-  if (!entity) return <>{id}</>
+function RelationText(props: FocusPanelProps & { relation: Relation; phase?: RelationPhase }) {
+  const { book, relation, phase } = props
+  const type = book.relationTypes.find((t) => t.id === phase?.type)
   return (
-    <Anchor component="button" type="button" size="sm" fw={600} c={entity.color} onClick={() => onSelect({ kind: 'entity', id })}>
-      {entity.name}
+    <>
+      <Ref {...props} id={relation.from} /> {type?.directed ? '→' : '↔'} <Ref {...props} id={relation.to} />:{' '}
+      {type && (
+        <Badge size="xs" variant="outline" color={type.color}>
+          {type.name} · {phase?.strength}
+        </Badge>
+      )}
+    </>
+  )
+}
+
+function TimingLink({ book, timing, onJump }: { book: Book; timing: Timing; onJump: (i: number) => void }) {
+  const [start, end] = bounds(book, timing)
+  const last = book.timePoints.length - 1
+  const text = start === end ? `${start + 1}` : start === 0 && end === last ? 'immer' : `${start + 1}–${end + 1}`
+  return (
+    <Anchor component="button" type="button" fw={600} size="sm" onClick={() => onJump(start)}>
+      {text}
     </Anchor>
+  )
+}
+
+function Ref(props: FocusPanelProps & { id: string }) {
+  const { book, id, onSelect } = props
+  const found = findElement(book, id)
+  if (!found) return <>{id}</>
+  return (
+    <Anchor component="button" type="button" size="sm" fw={600} c={elementColor(book, id)} onClick={() => onSelect({ kind: found.kind, id })}>
+      {found.label}
+    </Anchor>
+  )
+}
+
+function Markdown({ children, dimmed }: { children: string; dimmed?: boolean }) {
+  return (
+    <Text size="sm" c={dimmed ? 'dimmed' : undefined} mt={4} style={{ whiteSpace: 'pre-wrap' }}>
+      {children}
+    </Text>
   )
 }
 

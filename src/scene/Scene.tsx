@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, type ComponentRef } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Edges, Html, Line } from '@react-three/drei'
-import { DoubleSide, Plane, Vector3 } from 'three'
-import { RELATION_COLORS, type Book, type Entity, type Selection, type SliceState, type View } from '../model'
-import { LAYER_SIZE, SLICE_SPACING, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
+import { DoubleSide, Plane, Quaternion, Vector3 } from 'three'
+import { EVENT_COLOR, elementColor } from '../colors'
+import { covers, factsAt, phaseAt, type Book, type Selection, type TimePoint, type View } from '../model'
+import { LAYER_SIZE, SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
 
 interface SceneProps {
   book: Book
-  states: SliceState[]
+  points: TimePoint[]
   layout: Layout
   current: number
   view: View
@@ -18,15 +19,18 @@ interface SceneProps {
 }
 
 const noRaycast = () => null
+const UP = new Vector3(0, 1, 0)
 
 const setCursor = (pointer: boolean) => () => {
   document.body.style.cursor = pointer ? 'pointer' : ''
 }
 
-/** 3D-Raum-Zeit-Würfel: Ebenen je Ereignis, Personen als Stränge, Orte als Ringe, Beziehungen als Kanten */
+/** 3D-Raum-Zeit-Würfel: Ebenen je Zeitpunkt, Personen als Stränge, Orte als Ringe, Beziehungen als Kanten, Events als Marker */
 export function Scene(props: SceneProps) {
-  const { book, states, layout, current, view, selection, focus, onSelect, onJump } = props
-  const selectedId = selection?.kind === 'entity' ? selection.id : null
+  const { book, points, layout, current, view, selection, focus, onSelect, onJump } = props
+  const selectedId = selection?.id ?? null
+  const count = points.length
+  const color = (id: string) => elementColor(book, id)
 
   const emphasis = (id: string) => {
     if (!focus || id === selectedId) return 1
@@ -40,14 +44,12 @@ export function Scene(props: SceneProps) {
     if (view === 'netz') return i > current ? 0.3 / (i - current) : 0
     return 0.45
   }
+  const visible = points.map((_, i) => i).filter((i) => sliceOpacity(i) > 0)
 
-  const select = (id: string) => (e: ThreeEvent<MouseEvent>) => {
+  const select = (kind: Selection['kind'], id: string) => (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    onSelect({ kind: 'entity', id })
+    onSelect({ kind, id })
   }
-
-  const persons = book.entities.filter((e) => e.kind === 'person')
-  const places = book.entities.filter((e) => e.kind === 'place')
 
   return (
     <Canvas camera={{ position: [-20, 14, 30], fov: 45 }} onPointerMissed={(e) => {
@@ -57,88 +59,116 @@ export function Scene(props: SceneProps) {
       <color attach="background" args={['#0b0d12']} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[-10, 20, 15]} intensity={1.2} />
-      <CameraRig view={view} current={current} count={book.events.length} />
+      <CameraRig view={view} current={current} count={count} />
       <TimeClip enabled={view === 'netz'} x={current * SLICE_SPACING} />
 
-      {book.events.map((event, i) =>
-        sliceOpacity(i) > 0 ? (
-          <Layer key={event.id} index={i} title={event.title} active={i === current} opacity={sliceOpacity(i)} onJump={onJump} />
-        ) : null,
+      {visible.map((i) => (
+        <Layer key={points[i].id} index={i} title={points[i].name} active={i === current} opacity={sliceOpacity(i)} onJump={onJump} />
+      ))}
+
+      {book.places.map((place) => (
+        <Track
+          key={place.id}
+          track={layout.places.get(place.id)!}
+          color={color(place.id)}
+          lineWidth={1}
+          lineOpacity={0.25 * emphasis(place.id)}
+          visible={visible}
+          onClick={select('place', place.id)}
+          marker={(i) => (
+            <mesh rotation={[0, Math.PI / 2, 0]}>
+              <ringGeometry args={[ringRadius(place), ringRadius(place) + (i === current ? 0.3 : 0.15), 64]} />
+              <meshBasicMaterial color={color(place.id)} transparent opacity={emphasis(place.id) * sliceOpacity(i) * (i === current ? 0.9 : 0.5)} side={DoubleSide} depthWrite={false} />
+            </mesh>
+          )}
+        />
+      ))}
+
+      {book.persons.map((person) => (
+        <Track
+          key={person.id}
+          track={layout.persons.get(person.id)!}
+          color={color(person.id)}
+          lineWidth={person.id === selectedId ? 5 : 2.5}
+          lineOpacity={(view === 'netz' ? 0.35 : 0.85) * emphasis(person.id)}
+          visible={visible}
+          onClick={select('person', person.id)}
+          marker={(i) => (
+            <mesh>
+              <sphereGeometry args={[i === current ? 0.45 : 0.28, 24, 24]} />
+              <meshStandardMaterial color={color(person.id)} emissive={color(person.id)} emissiveIntensity={0.35} transparent opacity={emphasis(person.id) * sliceOpacity(i)} />
+            </mesh>
+          )}
+        />
+      ))}
+
+      {book.events.map((event) =>
+        visible.map((i) => {
+          const pos = event.place && covers(book, event.timing, i) ? layout.places.get(event.place)?.[i] : null
+          if (!pos) return null
+          return (
+            <mesh key={`${event.id}-${i}`} position={slicePoint(i, pos)} onClick={select('event', event.id)} onPointerOver={setCursor(true)} onPointerOut={setCursor(false)}>
+              <octahedronGeometry args={[i === current ? 0.5 : 0.32]} />
+              <meshStandardMaterial color={EVENT_COLOR} emissive={EVENT_COLOR} emissiveIntensity={0.4} transparent opacity={emphasis(event.id) * sliceOpacity(i)} />
+            </mesh>
+          )
+        }),
       )}
 
-      {places.map((place) => (
-        <PlaceRings
-          key={place.id}
-          place={place}
-          pos={layout.places.get(place.id)!}
-          count={book.events.length}
-          emphasis={emphasis(place.id)}
-          sliceOpacity={sliceOpacity}
-          current={current}
-          onClick={select(place.id)}
-        />
-      ))}
-
-      {persons.map((person) => (
-        <PersonStrand
-          key={person.id}
-          person={person}
-          track={layout.persons.get(person.id)!}
-          emphasis={emphasis(person.id)}
-          selected={person.id === selectedId}
-          strandOpacity={view === 'netz' ? 0.35 : 0.85}
-          sliceOpacity={sliceOpacity}
-          current={current}
-          onClick={select(person.id)}
-        />
-      ))}
-
-      {states.map((state, i) =>
-        sliceOpacity(i) > 0
-          ? state.relations.map((r) => {
-              const a = layout.persons.get(r.a)?.[i]
-              const b = layout.persons.get(r.b)?.[i]
-              if (!a || !b) return null
-              const involvesSelected = r.a === selectedId || r.b === selectedId
-              const relEmphasis = !focus ? 1 : involvesSelected ? 1 : focus.has(r.a) && focus.has(r.b) ? 0.3 : 0.08
-              return (
-                <Line
-                  key={`${i}-${r.a}-${r.b}`}
-                  points={[slicePoint(i, a), slicePoint(i, b)]}
-                  color={RELATION_COLORS[r.kind]}
-                  lineWidth={i === current ? 2.5 : 1.5}
-                  dashed={r.kind === 'misstrauen'}
-                  dashSize={0.3}
-                  gapSize={0.2}
-                  transparent
-                  opacity={sliceOpacity(i) * relEmphasis}
-                  raycast={noRaycast}
-                />
-              )
-            })
-          : null,
+      {visible.map((i) =>
+        factsAt(book, i).map((fact) => {
+          if (fact.kind !== 'relation') return null
+          const phase = phaseAt(book, fact.phases, i)
+          const type = book.relationTypes.find((t) => t.id === phase?.type)
+          const a = layout.persons.get(fact.from)?.[i]
+          const b = layout.persons.get(fact.to)?.[i]
+          if (!phase || !type || !a || !b) return null
+          const involvesSelected = fact.from === selectedId || fact.to === selectedId
+          const relEmphasis = !focus || involvesSelected ? 1 : focus.has(fact.from) && focus.has(fact.to) ? 0.3 : 0.08
+          const opacity = sliceOpacity(i) * relEmphasis
+          return (
+            <group key={`${i}-${fact.id}`}>
+              <Line
+                points={[slicePoint(i, a), slicePoint(i, b)]}
+                color={type.color}
+                lineWidth={phase.strength * (i === current ? 0.8 : 0.5) + 0.5}
+                transparent
+                opacity={opacity}
+                raycast={noRaycast}
+              />
+              {type.directed && <Arrowhead from={slicePoint(i, a)} to={slicePoint(i, b)} color={type.color} opacity={opacity} />}
+            </group>
+          )
+        }),
       )}
 
       {/* Beschriftungen nur auf der aktuellen Ebene */}
-      {places.map((place) => {
-        const pos = layout.places.get(place.id)!
+      {book.places.map((place) => {
+        const pos = layout.places.get(place.id)![current]
+        if (!pos) return null
         return (
-          <Label key={place.id} position={slicePoint(current, [pos[0], pos[1] - 2.6])} color={place.color} dim={emphasis(place.id) < 0.5} onClick={() => onSelect({ kind: 'entity', id: place.id })}>
+          <Label
+            key={place.id}
+            position={slicePoint(current, [pos[0], pos[1] - ringRadius(place) - 0.5])}
+            color={color(place.id)}
+            dim={emphasis(place.id) < 0.5}
+            onClick={() => onSelect({ kind: 'place', id: place.id })}
+          >
             {place.name}
           </Label>
         )
       })}
-      {persons.map((person) => {
+      {book.persons.map((person) => {
         const pos = layout.persons.get(person.id)![current]
         if (!pos) return null
         return (
           <Label
             key={person.id}
             position={slicePoint(current, [pos[0], pos[1] + 0.9])}
-            color={person.color}
+            color={color(person.id)}
             dim={emphasis(person.id) < 0.5}
             strong
-            onClick={() => onSelect({ kind: 'entity', id: person.id })}
+            onClick={() => onSelect({ kind: 'person', id: person.id })}
           >
             {person.name}
           </Label>
@@ -194,57 +224,42 @@ function Layer(props: { index: number; title: string; active: boolean; opacity: 
   )
 }
 
-function PlaceRings(props: {
-  place: Entity
-  pos: NetPos
-  count: number
-  emphasis: number
-  sliceOpacity: (i: number) => number
-  current: number
-  onClick: (e: ThreeEvent<MouseEvent>) => void
-}) {
-  const { place, pos, count, emphasis, sliceOpacity, current, onClick } = props
-  return (
-    <>
-      <Line points={[slicePoint(0, pos), slicePoint(count - 1, pos)]} color={place.color} lineWidth={1} transparent opacity={0.25 * emphasis} raycast={noRaycast} />
-      {Array.from({ length: count }, (_, i) =>
-        sliceOpacity(i) > 0 ? (
-          <mesh key={i} position={slicePoint(i, pos)} rotation={[0, Math.PI / 2, 0]} onClick={onClick} onPointerOver={setCursor(true)} onPointerOut={setCursor(false)}>
-            <ringGeometry args={[2.1, i === current ? 2.4 : 2.25, 64]} />
-            <meshBasicMaterial color={place.color} transparent opacity={emphasis * sliceOpacity(i) * (i === current ? 0.9 : 0.5)} side={DoubleSide} depthWrite={false} />
-          </mesh>
-        ) : null,
-      )}
-    </>
-  )
-}
-
-function PersonStrand(props: {
-  person: Entity
+function Track(props: {
   track: (NetPos | null)[]
-  emphasis: number
-  selected: boolean
-  strandOpacity: number
-  sliceOpacity: (i: number) => number
-  current: number
+  color: string
+  lineWidth: number
+  lineOpacity: number
+  visible: number[]
   onClick: (e: ThreeEvent<MouseEvent>) => void
+  marker: (i: number) => React.ReactNode
 }) {
-  const { person, track, emphasis, selected, strandOpacity, sliceOpacity, current, onClick } = props
+  const { track, color, lineWidth, lineOpacity, visible, onClick, marker } = props
   const segments = useMemo(() => strandSegments(track), [track])
   return (
     <>
       {segments.map((points, k) => (
-        <Line key={k} points={points} color={person.color} lineWidth={selected ? 5 : 2.5} transparent opacity={strandOpacity * emphasis} onClick={onClick} />
+        <Line key={k} points={points} color={color} lineWidth={lineWidth} transparent opacity={lineOpacity} onClick={onClick} />
       ))}
-      {track.map((pos, i) =>
-        pos && sliceOpacity(i) > 0 ? (
-          <mesh key={i} position={slicePoint(i, pos)} onClick={onClick} onPointerOver={setCursor(true)} onPointerOut={setCursor(false)}>
-            <sphereGeometry args={[i === current ? 0.45 : 0.28, 24, 24]} />
-            <meshStandardMaterial color={person.color} emissive={person.color} emissiveIntensity={0.35} transparent opacity={emphasis * sliceOpacity(i)} />
-          </mesh>
-        ) : null,
-      )}
+      {visible.map((i) => {
+        const pos = track[i]
+        return pos ? (
+          <group key={i} position={slicePoint(i, pos)} onClick={onClick} onPointerOver={setCursor(true)} onPointerOut={setCursor(false)}>
+            {marker(i)}
+          </group>
+        ) : null
+      })}
     </>
+  )
+}
+
+function Arrowhead({ from, to, color, opacity }: { from: Vector3; to: Vector3; color: string; opacity: number }) {
+  const dir = to.clone().sub(from).normalize()
+  const position = to.clone().sub(dir.clone().multiplyScalar(0.75))
+  return (
+    <mesh position={position} quaternion={new Quaternion().setFromUnitVectors(UP, dir)} raycast={noRaycast}>
+      <coneGeometry args={[0.16, 0.45, 12]} />
+      <meshBasicMaterial color={color} transparent opacity={opacity} />
+    </mesh>
   )
 }
 

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ActionIcon, Button, Group, Kbd, Paper, SegmentedControl, Slider, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Button, Group, Kbd, Paper, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core'
 import { useHotkeys } from '@mantine/hooks'
 import { spotlight } from '@mantine/spotlight'
-import { RELATION_COLORS, computeStates, focusSet, type RelationKind, type Selection, type View } from './model'
+import { focusSet, timeline, type Selection, type View } from './model'
 import { sampleBook } from './sampleBook'
 import { computeLayout } from './scene/layout'
 import { Scene } from './scene/Scene'
@@ -17,15 +17,12 @@ function App() {
   const [current, setCurrent] = useState(0)
   const [selection, setSelection] = useState<Selection | null>(null)
 
-  const states = useMemo(() => computeStates(book), [])
-  const layout = useMemo(() => computeLayout(book, states), [states])
-  const focus = useMemo(() => focusSet(book, states, selection), [states, selection])
+  const points = useMemo(() => timeline(book), [])
+  const layout = useMemo(() => computeLayout(book, points.length), [points])
+  const focus = useMemo(() => focusSet(book, selection), [selection])
 
-  const last = book.events.length - 1
-  const jump = (index: number) => {
-    setCurrent(index)
-    setSelection({ kind: 'event', id: book.events[index].id })
-  }
+  const last = points.length - 1
+  const point = points[current]
 
   useHotkeys([
     ['1', () => setView('raum')],
@@ -36,17 +33,7 @@ function App() {
 
   return (
     <div className="app">
-      <Scene
-        book={book}
-        states={states}
-        layout={layout}
-        current={current}
-        view={view}
-        selection={selection}
-        focus={focus}
-        onSelect={setSelection}
-        onJump={jump}
-      />
+      <Scene book={book} points={points} layout={layout} current={current} view={view} selection={selection} focus={focus} onSelect={setSelection} onJump={setCurrent} />
 
       <Paper className="overlay toolbar" p="md" radius="md" withBorder shadow="lg">
         <Stack gap="sm">
@@ -68,11 +55,11 @@ function App() {
             Suchen
           </Button>
           <Group gap="xs">
-            {(Object.keys(RELATION_COLORS) as RelationKind[]).map((kind) => (
-              <Group key={kind} gap={4}>
-                <span className="legend-line" style={{ background: RELATION_COLORS[kind] }} />
+            {book.relationTypes.map((type) => (
+              <Group key={type.id} gap={4}>
+                <span className="legend-line" style={{ background: type.color }} />
                 <Text size="xs" c="dimmed">
-                  {kind}
+                  {type.name}
                 </Text>
               </Group>
             ))}
@@ -80,16 +67,19 @@ function App() {
         </Stack>
       </Paper>
 
-      {selection && <FocusPanel book={book} states={states} current={current} selection={selection} onSelect={setSelection} onJump={jump} />}
+      {selection && <FocusPanel book={book} points={points} current={current} selection={selection} onSelect={setSelection} onJump={setCurrent} />}
 
       <Paper className="overlay timebar" p="md" radius="md" withBorder shadow="lg">
-        <UnstyledButton onClick={() => jump(current)}>
-          <Text size="sm" fw={600}>
-            {current + 1}. {book.events[current].title}
-          </Text>
-        </UnstyledButton>
+        <Text size="sm" fw={600}>
+          {current + 1}. {point.name}
+          {point.dateLabel && (
+            <Text span size="xs" c="dimmed" fw={400} ml="xs">
+              {point.dateLabel}
+            </Text>
+          )}
+        </Text>
         <Group gap="md" wrap="nowrap" mt="xs" mb="md">
-          <ActionIcon variant="default" onClick={() => setCurrent(current - 1)} disabled={current === 0} aria-label="Vorheriges Ereignis">
+          <ActionIcon variant="default" onClick={() => setCurrent(current - 1)} disabled={current === 0} aria-label="Vorheriger Zeitpunkt">
             ‹
           </ActionIcon>
           <Slider
@@ -99,16 +89,16 @@ function App() {
             step={1}
             value={current}
             onChange={setCurrent}
-            label={(i) => book.events[i].title}
-            marks={book.events.map((_, i) => ({ value: i, label: i + 1 }))}
+            label={(i) => points[i].name}
+            marks={points.map((_, i) => ({ value: i, label: i + 1 }))}
           />
-          <ActionIcon variant="default" onClick={() => setCurrent(current + 1)} disabled={current === last} aria-label="Nächstes Ereignis">
+          <ActionIcon variant="default" onClick={() => setCurrent(current + 1)} disabled={current === last} aria-label="Nächster Zeitpunkt">
             ›
           </ActionIcon>
         </Group>
       </Paper>
 
-      <Search book={book} onSelect={setSelection} onJump={jump} />
+      <Search book={book} points={points} onSelect={setSelection} onJump={setCurrent} />
     </div>
   )
 }
