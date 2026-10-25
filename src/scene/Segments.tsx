@@ -50,12 +50,6 @@ function SegmentGroup({ items, fade }: { items: Segment[]; fade: number }) {
     return segments
   }, [items])
 
-  useLayoutEffect(() => {
-    line.material.resolution.set(size.width, size.height)
-  }, [line, size])
-  useLayoutEffect(() => {
-    line.material.opacity = items[0]!.opacity * fade
-  }, [line, items, fade])
   useLayoutEffect(
     () => () => {
       line.geometry.dispose()
@@ -63,5 +57,5 @@ function SegmentGroup({ items, fade }: { items: Segment[]; fade: number }) {
     },
     [line],
   )
-  return <primitive object={line} />
+  return <primitive object={line} material-opacity={items[0]!.opacity * fade} material-resolution={[size.width, size.height]} />
 }

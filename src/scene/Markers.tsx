@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
-import { BufferGeometry, Color, DoubleSide, InstancedMesh, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Quaternion, Vector3 } from 'three'
+import { BufferGeometry, Color, DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three'
 
 /** Ein Marker in der Szene; Marker mit gleicher Form und Deckkraft teilen sich ein Instanced Mesh */
 export interface Marker {
@@ -26,6 +26,11 @@ const matrix = new Matrix4()
 const unit = new Vector3(1, 1, 1)
 const none = new Quaternion()
 
+// Leuchtfarbe pro Instanz: das Leuchten mit der Instanzfarbe multiplizieren
+const glowPerInstance = (shader: { fragmentShader: string }) => {
+  shader.fragmentShader = shader.fragmentShader.replace('vec3 totalEmissiveRadiance = emissive;', 'vec3 totalEmissiveRadiance = emissive * vColor.rgb;')
+}
+
 /** Viele gleichartige Marker mit wenigen Draw Calls: je Form und Deckkraft ein Instanced Mesh */
 export function Markers({ items, geometry, glow, fade = 1, onClick }: MarkersProps) {
   const groups = useMemo(() => {
@@ -48,14 +53,6 @@ export function Markers({ items, geometry, glow, fade = 1, onClick }: MarkersPro
 function MarkerGroup({ items, geometry, glow, fade = 1, onClick }: Omit<MarkersProps, 'geometry'> & { geometry: BufferGeometry }) {
   const mesh = useRef<InstancedMesh>(null)
   const opacity = items[0]!.opacity
-  const material = useMemo(() => {
-    if (glow === undefined) return new MeshBasicMaterial({ transparent: true, opacity, depthWrite: false, side: DoubleSide })
-    const lit = new MeshStandardMaterial({ transparent: true, opacity, emissive: new Color(glow, glow, glow) })
-    lit.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace('vec3 totalEmissiveRadiance = emissive;', 'vec3 totalEmissiveRadiance = emissive * vColor.rgb;')
-    }
-    return lit
-  }, [glow, opacity])
 
   useLayoutEffect(() => {
     const target = mesh.current
@@ -70,10 +67,6 @@ function MarkerGroup({ items, geometry, glow, fade = 1, onClick }: Omit<MarkersP
     target.computeBoundingSphere()
   }, [items])
 
-  useLayoutEffect(() => {
-    material.opacity = opacity * fade
-  }, [material, opacity, fade])
-  useLayoutEffect(() => () => material.dispose(), [material])
 
   const click = (e: ThreeEvent<MouseEvent>) => {
     const item = e.instanceId === undefined ? undefined : items[e.instanceId]
@@ -85,10 +78,16 @@ function MarkerGroup({ items, geometry, glow, fade = 1, onClick }: Omit<MarkersP
   return (
     <instancedMesh
       ref={mesh}
-      args={[geometry, material, items.length]}
+      args={[geometry, undefined, items.length]}
       {...(onClick
         ? { onClick: click, onPointerOver: () => (document.body.style.cursor = 'pointer'), onPointerOut: () => (document.body.style.cursor = '') }
         : { raycast: () => null })}
-    />
+    >
+      {glow === undefined ? (
+        <meshBasicMaterial transparent opacity={opacity * fade} depthWrite={false} side={DoubleSide} />
+      ) : (
+        <meshStandardMaterial transparent opacity={opacity * fade} emissive={[glow, glow, glow]} onBeforeCompile={glowPerInstance} />
+      )}
+    </instancedMesh>
   )
 }
