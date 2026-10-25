@@ -13,6 +13,11 @@ export interface ActiveBook {
   imageUrl: (file: string) => Promise<string | undefined>
 }
 
+const TYPES: Record<string, string> = { svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' }
+
+// GitHub liefert Dateien ohne Typ, ohne ihn lädt der Browser z. B. kein SVG als Bild
+const imageType = (file: string) => TYPES[file.split('.').pop()!.toLowerCase()] ?? ''
+
 const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles), repo: null, imageUrl: async (file) => sampleImages[file] })
 
 async function loadActive(): Promise<ActiveBook> {
@@ -29,7 +34,7 @@ async function loadActive(): Promise<ActiveBook> {
       blob = await new GitHub(key, repo).blob(image.sha)
       await imageCache.put(repo, image.sha, blob)
     }
-    return blob && URL.createObjectURL(blob)
+    return blob && URL.createObjectURL(new Blob([blob], { type: imageType(file) }))
   }
   return {
     ...filesToBook(copy.files),

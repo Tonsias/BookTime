@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
+import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Edges, Line, useTexture } from '@react-three/drei'
@@ -240,10 +240,22 @@ function Backdrop(props: { file: string; imageUrl: SceneProps['imageUrl']; posit
     imageUrl(file).then(setUrl)
   }, [file, imageUrl])
   return url ? (
-    <Suspense fallback={null}>
-      <BackdropPlane {...props} url={url} />
-    </Suspense>
+    <SkipOnError>
+      <Suspense fallback={null}>
+        <BackdropPlane {...props} url={url} />
+      </Suspense>
+    </SkipOnError>
   ) : null
+}
+
+class SkipOnError extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    return this.state.failed ? null : this.props.children
+  }
 }
 
 function BackdropPlane({ url, position, width, opacity }: { url: string; position: Vector3; width: number; opacity: number }) {
