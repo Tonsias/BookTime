@@ -32,6 +32,8 @@ Die Entscheidungen wurden einzeln per Rückfrage getroffen.
 | 18 | Szene für **große Bücher** (300 Personen, 100 Orte, 60 Zeitpunkte, 1000 Beziehungen): Marker als Instanced Meshes, Beziehungen als gebündelte Linien, eine gemeinsame Beschriftungsebene | Gemessen 4 → 60 Bilder/s im Produktions-Build |
 | 19 | Aufräumen: totes `createBlob` entfernt, `active.ts` nach `src/storage/`, `View` und `Selection` nach `src/ui/types.ts`, Fakt-Arten ausdrücklich statt über das End-„s“ | Weniger Überraschungen im Code |
 | 20 | **Umsetzungsstand** je Festlegung steht in jedem Dokument unter `docs/` | Doku und Code stimmen überein |
+| 21 | Szene baut **nur geänderte Ebenen** neu auf, die Deckkraft einer Ebene ändert nur Materialien, Echo-Ebenen der Netz-Ansicht unter 2 % Deckkraft entfallen, Beschriftungen schreiben nur geänderte Stile | Großes Buch: Zeitschritt in der Raum-Ansicht 320 → 33 ms, in der Netz-Ansicht 200–300 → 80–120 ms, Auswahl 340 → 120–150 ms |
+| 22 | Tests für die Speicherung pro Datei (mit `fake-indexeddb`, auch Übernahme aus Speicherversion 1) und die Markdown-Darstellung (Rendern als HTML) | Die letzten ungetesteten Teile der Maßnahmen |
 
 ## Nicht umgesetzt
 
@@ -39,8 +41,6 @@ Die Entscheidungen wurden einzeln per Rückfrage getroffen.
 |---|---|
 | Mehrere offene Tabs gegeneinander abgleichen | nicht gewählt |
 | Export nicht gepushter Änderungen als Datei | nicht gewählt |
-| Szene: Reaktionszeit beim Zeitschritt und bei Auswahl (großes Buch etwa 320 ms) | offen, nächster Schritt wäre, nur geänderte Ebenen neu aufzubauen |
-| Tests für die Speicherung pro Datei und die Markdown-Darstellung | offen, bräuchten weitere Test-Abhängigkeiten (IndexedDB-Nachbau, DOM-Umgebung) |
 | Eigener Origin (Organisation oder Domain) | abgelehnt, siehe Festlegung 11 |
 | Szenen-Vorschlag (Gruppen und Events ohne Ort sichtbar, große Bücher) | nicht gewählt |
 | Hinweise auf der GitHub-Seite | nicht gewählt |

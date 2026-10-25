@@ -15,7 +15,7 @@ export interface Segment {
 }
 
 /** Viele breite Linien mit wenigen Draw Calls: je Breite und Deckkraft ein LineSegments2 */
-export function Segments({ items }: { items: Segment[] }) {
+export function Segments({ items, fade = 1 }: { items: Segment[]; fade?: number }) {
   const groups = useMemo(() => {
     const map = new Map<string, Segment[]>()
     for (const item of items) {
@@ -27,13 +27,13 @@ export function Segments({ items }: { items: Segment[] }) {
   return (
     <>
       {groups.map((group) => (
-        <SegmentGroup key={`${group[0]!.width}|${group[0]!.opacity}|${group.length}`} items={group} />
+        <SegmentGroup key={`${group[0]!.width}|${group[0]!.opacity}|${group.length}`} items={group} fade={fade} />
       ))}
     </>
   )
 }
 
-function SegmentGroup({ items }: { items: Segment[] }) {
+function SegmentGroup({ items, fade }: { items: Segment[]; fade: number }) {
   const size = useThree((s) => s.size)
   const line = useMemo(() => {
     const geometry = new LineSegmentsGeometry()
@@ -53,6 +53,9 @@ function SegmentGroup({ items }: { items: Segment[] }) {
   useLayoutEffect(() => {
     line.material.resolution.set(size.width, size.height)
   }, [line, size])
+  useLayoutEffect(() => {
+    line.material.opacity = items[0]!.opacity * fade
+  }, [line, items, fade])
   useLayoutEffect(
     () => () => {
       line.geometry.dispose()

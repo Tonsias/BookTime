@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
+import { Component, memo, Suspense, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Edges, Line, useTexture } from '@react-three/drei'
 import { BufferGeometry, ConeGeometry, DoubleSide, OctahedronGeometry, Plane, Quaternion, RingGeometry, SphereGeometry, SRGBColorSpace, Vector3 } from 'three'
@@ -23,6 +23,12 @@ interface SceneProps {
 }
 
 const noRaycast = () => null
+
+const emphasisOf = (focus: Set<string> | null, selectedId: string | null) => (id: string) => {
+  if (!focus || id === selectedId) return 1
+  if (focus.has(id)) return selectedId ? 0.6 : 1
+  return 0.12
+}
 const UP = new Vector3(0, 1, 0)
 
 const ringShape = (radius: number, current: boolean) => `ring:${radius}:${current}`
@@ -49,16 +55,13 @@ export function Scene(props: SceneProps) {
   const count = points.length
   const color = (id: string) => elementColor(book, id)
 
-  const emphasis = (id: string) => {
-    if (!focus || id === selectedId) return 1
-    if (focus.has(id)) return selectedId ? 0.6 : 1
-    return 0.12
-  }
+  const emphasis = emphasisOf(focus, selectedId)
 
   // In der Netz-Ansicht schaut man entlang der Zeit: Vergangenheit ausblenden, Zukunft als Echo
   const sliceOpacity = (i: number) => {
     if (i === current) return 1
-    if (view === 'netz') return i > current ? 0.3 / (i - current) : 0
+    // Echos unter 2 % Deckkraft sind unsichtbar, kosten aber Zeichenzeit
+    if (view === 'netz') return i > current && i - current <= 15 ? 0.3 / (i - current) : 0
     return 0.45
   }
   const visible = points.map((_, i) => i).filter((i) => sliceOpacity(i) > 0)
@@ -66,58 +69,6 @@ export function Scene(props: SceneProps) {
   const select = (kind: Selection['kind'], id: string) => (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
     onSelect({ kind, id })
-  }
-  const pick = (kind: Selection['kind']) => (marker: Marker) => onSelect({ kind, id: marker.key.split('@')[0]! })
-
-  const markerAt = (id: string, i: number, pos: NetPos, shape: string, opacity: number, scale?: number): Marker => ({
-    key: `${id}@${i}`,
-    shape,
-    position: slicePoint(i, pos),
-    color: color(id),
-    opacity,
-    scale,
-  })
-
-  const rings = visible.flatMap((i) =>
-    book.places.flatMap((place) => {
-      const pos = layout.places.get(place.id)?.[i]
-      const opacity = emphasis(place.id) * sliceOpacity(i) * (i === current ? 0.9 : 0.5)
-      return pos ? [markerAt(place.id, i, pos, ringShape(ringRadius(place), i === current), opacity)] : []
-    }),
-  )
-  const spheres = visible.flatMap((i) =>
-    book.persons.flatMap((person) => {
-      const pos = layout.persons.get(person.id)?.[i]
-      return pos ? [markerAt(person.id, i, pos, 'sphere', emphasis(person.id) * sliceOpacity(i), i === current ? 0.45 : 0.28)] : []
-    }),
-  )
-  const octahedra = visible.flatMap((i) =>
-    book.events.flatMap((event) => {
-      const pos = event.place && covers(book, event.timing, i) ? layout.places.get(event.place)?.[i] : undefined
-      return pos ? [markerAt(event.id, i, pos, 'octahedron', emphasis(event.id) * sliceOpacity(i), i === current ? 0.5 : 0.32)] : []
-    }),
-  )
-
-  const lines: Segment[] = []
-  const arrows: Marker[] = []
-  for (const i of visible) {
-    for (const fact of factsAt(book, i)) {
-      if (fact.kind !== 'relation') continue
-      const phase = phaseAt(book, fact.phases, i)
-      const type = book.relationTypes.find((t) => t.id === phase?.type)
-      const a = layout.persons.get(fact.from)?.[i]
-      const b = layout.persons.get(fact.to)?.[i]
-      if (!phase || !type || !a || !b) continue
-      const involvesSelected = fact.from === selectedId || fact.to === selectedId
-      const relEmphasis = !focus || involvesSelected ? 1 : focus.has(fact.from) && focus.has(fact.to) ? 0.3 : 0.08
-      const opacity = sliceOpacity(i) * relEmphasis
-      const [from, to] = [slicePoint(i, a), slicePoint(i, b)]
-      lines.push({ from, to, color: type.color, width: phase.strength * (i === current ? 0.8 : 0.5) + 0.5, opacity })
-      if (!type.directed) continue
-      const dir = to.clone().sub(from).normalize()
-      const position = to.clone().sub(dir.clone().multiplyScalar(0.75))
-      arrows.push({ key: `${fact.id}@${i}`, shape: 'cone', position, color: type.color, opacity, rotation: new Quaternion().setFromUnitVectors(UP, dir) })
-    }
   }
 
   const labels: Label[] = visible.map((i) => ({
@@ -185,15 +136,81 @@ export function Scene(props: SceneProps) {
           onClick={select('person', person.id)}
         />
       ))}
-      <Markers items={rings} geometry={geometryFor} onClick={pick('place')} />
-      <Markers items={spheres} geometry={geometryFor} glow={0.35} onClick={pick('person')} />
-      <Markers items={octahedra} geometry={geometryFor} glow={0.4} onClick={pick('event')} />
-      <Segments items={lines} />
-      <Markers items={arrows} geometry={geometryFor} />
+      {visible.map((i) => (
+        <LayerContent key={i} book={book} layout={layout} index={i} active={i === current} opacity={sliceOpacity(i)} focus={focus} selectedId={selectedId} onSelect={onSelect} />
+      ))}
       <Labels items={labels} />
     </Canvas>
   )
 }
+
+interface LayerContentProps {
+  book: Book
+  layout: Layout
+  index: number
+  active: boolean
+  opacity: number
+  focus: Set<string> | null
+  selectedId: string | null
+  onSelect: (selection: Selection | null) => void
+}
+
+/** Marker und Beziehungen einer Ebene; wird nur neu aufgebaut, wenn sich diese Ebene ändert */
+const LayerContent = memo(function LayerContent({ book, layout, index: i, active, opacity: slice, focus, selectedId, onSelect }: LayerContentProps) {
+  const { rings, spheres, octahedra, lines, arrows } = useMemo(() => {
+    const emphasis = emphasisOf(focus, selectedId)
+    const markerAt = (id: string, pos: NetPos, shape: string, opacity: number, scale?: number): Marker => ({
+      key: id,
+      shape,
+      position: slicePoint(i, pos),
+      color: elementColor(book, id),
+      opacity,
+      scale,
+    })
+    const rings = book.places.flatMap((place) => {
+      const pos = layout.places.get(place.id)?.[i]
+      return pos ? [markerAt(place.id, pos, ringShape(ringRadius(place), active), emphasis(place.id) * (active ? 0.9 : 0.5))] : []
+    })
+    const spheres = book.persons.flatMap((person) => {
+      const pos = layout.persons.get(person.id)?.[i]
+      return pos ? [markerAt(person.id, pos, 'sphere', emphasis(person.id), active ? 0.45 : 0.28)] : []
+    })
+    const octahedra = book.events.flatMap((event) => {
+      const pos = event.place && covers(book, event.timing, i) ? layout.places.get(event.place)?.[i] : undefined
+      return pos ? [markerAt(event.id, pos, 'octahedron', emphasis(event.id), active ? 0.5 : 0.32)] : []
+    })
+    const lines: Segment[] = []
+    const arrows: Marker[] = []
+    for (const fact of factsAt(book, i)) {
+      if (fact.kind !== 'relation') continue
+      const phase = phaseAt(book, fact.phases, i)
+      const type = book.relationTypes.find((t) => t.id === phase?.type)
+      const a = layout.persons.get(fact.from)?.[i]
+      const b = layout.persons.get(fact.to)?.[i]
+      if (!phase || !type || !a || !b) continue
+      const involvesSelected = fact.from === selectedId || fact.to === selectedId
+      const opacity = !focus || involvesSelected ? 1 : focus.has(fact.from) && focus.has(fact.to) ? 0.3 : 0.08
+      const [from, to] = [slicePoint(i, a), slicePoint(i, b)]
+      lines.push({ from, to, color: type.color, width: phase.strength * (active ? 0.8 : 0.5) + 0.5, opacity })
+      if (!type.directed) continue
+      const dir = to.clone().sub(from).normalize()
+      const position = to.clone().sub(dir.clone().multiplyScalar(0.75))
+      arrows.push({ key: fact.id, shape: 'cone', position, color: type.color, opacity, rotation: new Quaternion().setFromUnitVectors(UP, dir) })
+    }
+    return { rings, spheres, octahedra, lines, arrows }
+  }, [book, layout, i, active, focus, selectedId])
+
+  const pick = (kind: Selection['kind']) => (marker: Marker) => onSelect({ kind, id: marker.key })
+  return (
+    <>
+      <Markers items={rings} geometry={geometryFor} fade={slice} onClick={pick('place')} />
+      <Markers items={spheres} geometry={geometryFor} glow={0.35} fade={slice} onClick={pick('person')} />
+      <Markers items={octahedra} geometry={geometryFor} glow={0.4} fade={slice} onClick={pick('event')} />
+      <Segments items={lines} fade={slice} />
+      <Markers items={arrows} geometry={geometryFor} fade={slice} />
+    </>
+  )
+})
 
 function CameraRig({ view, current, count }: { view: View; current: number; count: number }) {
   const ref = useRef<ComponentRef<typeof CameraControls>>(null)

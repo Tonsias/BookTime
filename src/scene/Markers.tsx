@@ -17,6 +17,8 @@ interface MarkersProps {
   items: Marker[]
   geometry: (shape: string) => BufferGeometry
   glow?: number
+  /** Zusätzliche Deckkraft der ganzen Ebene, ändert nur die Materialien */
+  fade?: number
   onClick?: (item: Marker) => void
 }
 
@@ -25,7 +27,7 @@ const unit = new Vector3(1, 1, 1)
 const none = new Quaternion()
 
 /** Viele gleichartige Marker mit wenigen Draw Calls: je Form und Deckkraft ein Instanced Mesh */
-export function Markers({ items, geometry, glow, onClick }: MarkersProps) {
+export function Markers({ items, geometry, glow, fade = 1, onClick }: MarkersProps) {
   const groups = useMemo(() => {
     const map = new Map<string, Marker[]>()
     for (const item of items) {
@@ -37,13 +39,13 @@ export function Markers({ items, geometry, glow, onClick }: MarkersProps) {
   return (
     <>
       {groups.map(([key, group]) => (
-        <MarkerGroup key={`${key}|${group.length}`} items={group} geometry={geometry(group[0]!.shape)} glow={glow} onClick={onClick} />
+        <MarkerGroup key={`${key}|${group.length}`} items={group} geometry={geometry(group[0]!.shape)} glow={glow} fade={fade} onClick={onClick} />
       ))}
     </>
   )
 }
 
-function MarkerGroup({ items, geometry, glow, onClick }: Omit<MarkersProps, 'geometry'> & { geometry: BufferGeometry }) {
+function MarkerGroup({ items, geometry, glow, fade = 1, onClick }: Omit<MarkersProps, 'geometry'> & { geometry: BufferGeometry }) {
   const mesh = useRef<InstancedMesh>(null)
   const opacity = items[0]!.opacity
   const material = useMemo(() => {
@@ -68,6 +70,9 @@ function MarkerGroup({ items, geometry, glow, onClick }: Omit<MarkersProps, 'geo
     target.computeBoundingSphere()
   }, [items])
 
+  useLayoutEffect(() => {
+    material.opacity = opacity * fade
+  }, [material, opacity, fade])
   useLayoutEffect(() => () => material.dispose(), [material])
 
   const click = (e: ThreeEvent<MouseEvent>) => {

@@ -51,9 +51,9 @@ export function Labels({ items }: { items: Label[] }) {
       const node = nodes[i] as HTMLElement | undefined
       if (!node) return
       projected.copy(item.position).project(camera)
-      node.style.display = projected.z > 1 ? 'none' : ''
-      node.style.zIndex = String(Math.round((1 - projected.z) * 5))
-      node.style.transform = `translate3d(${((projected.x + 1) / 2) * size.width}px,${((1 - projected.y) / 2) * size.height}px,0)`
+      // Nur geänderte Werte schreiben, jede Stiländerung an 400 Knoten kostet Layout-Zeit
+      const style = { display: projected.z > 1 ? 'none' : '', zIndex: String(Math.round((1 - projected.z) * 5)), transform: `translate3d(${Math.round(((projected.x + 1) / 2) * size.width)}px,${Math.round(((1 - projected.y) / 2) * size.height)}px,0)` }
+      for (const key of ['display', 'zIndex', 'transform'] as const) if (node.style[key] !== style[key]) node.style[key] = style[key]
     })
   })
 

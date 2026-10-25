@@ -34,7 +34,7 @@ manuell).
 |---|---|---|
 | Lint | `npm run lint` (oxlint) | keine Fehler und Warnungen |
 | Typen | `npm run typecheck` (`tsc -b`, `strict`, `noUncheckedIndexedAccess`) | keine Fehler |
-| Tests | `npm test` (Vitest, `src/**/*.test.ts`) | alle grün |
+| Tests | `npm test` (Vitest, `src/**/*.test.{ts,tsx}`) | alle grün |
 | Dead Code | `npm run check:dead` (knip) | keine ungenutzten Dateien, Exporte, Typen oder Abhängigkeiten |
 | Duplikate | `npm run check:dup` (jscpd, `.jscpd.json`) | höchstens 3 % duplizierter Code in `src/` |
 | Doku | `npm run check:docs` (`scripts/check-docs.mjs`) | jeder Export hat JSDoc (100 %); alle Kommentare inkl. JSDoc höchstens 5 % der Zeilen |
