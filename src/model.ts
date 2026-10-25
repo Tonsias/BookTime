@@ -1,12 +1,23 @@
 /** Zeitpunkt (`at`) oder Zeitspanne; fehlendes from/to = Anfang/Ende der Geschichte, Grenzen eingeschlossen */
 export type Timing = { at: string } | { from?: string; to?: string }
 
+/** Hintergrundbild einer Zeitebene, Mittelpunkt und Breite in Weltkoordinaten */
+interface Background {
+  id: string
+  file: string
+  x: number
+  y: number
+  width: number
+  note?: string
+}
+
 /** Benannter Punkt in der Geschichte */
 export interface TimePoint {
   id: string
   name: string
   dateLabel?: string
   order: number
+  background?: Background
   note?: string
 }
 
@@ -272,6 +283,12 @@ export function imageAt(book: Book, owner: string, i: number): Image | undefined
   }
   return firstValid(book, found.element.images, i)
 }
+
+/** Hintergrund zum Index i: der eigene oder der des nächsten früheren Zeitpunkts mit Hintergrund */
+export const backgroundAt = (book: Book, i: number) =>
+  timeline(book)
+    .slice(0, i + 1)
+    .findLast((t) => t.background)?.background
 
 /** Alle Elemente, die mit der Auswahl irgendwann verbunden sind */
 export function focusSet(book: Book, selection: Selection | null): Set<string> | null {

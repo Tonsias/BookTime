@@ -38,7 +38,7 @@ function BookView({ active }: { active: ActiveBook }) {
 
   return (
     <div className="app">
-      <Scene book={book} points={points} layout={layout} current={current} view={view} selection={selection} focus={focus} onSelect={setSelection} onJump={setCurrent} />
+      <Scene book={book} imageUrl={active.imageUrl} points={points} layout={layout} current={current} view={view} selection={selection} focus={focus} onSelect={setSelection} onJump={setCurrent} />
 
       <Paper className="overlay toolbar" p="md" radius="md" withBorder shadow="lg">
         <Stack gap="sm">

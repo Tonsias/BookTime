@@ -13,9 +13,9 @@ export interface LoadError {
 export const FORMAT = 1
 
 type RefKind = 'timePoint' | 'person' | 'group' | 'actor' | 'place' | 'event' | 'relationType'
-type Scalar = 'id' | 'string' | 'number' | 'boolean' | 'color' | 'timing' | 'strength' | RefKind
+type Scalar = 'id' | 'string' | 'number' | 'positive' | 'boolean' | 'color' | 'timing' | 'strength' | RefKind
 interface Spec {
-  [key: string]: Scalar | `${Scalar}?` | Spec[]
+  [key: string]: Scalar | `${Scalar}?` | Spec[] | Spec
 }
 
 const IMAGE: Spec = { id: 'id', file: 'string', order: 'number', timing: 'timing?', note: 'string?' }
@@ -31,7 +31,13 @@ interface Kind {
 }
 
 const KINDS: Kind[] = [
-  { key: 'timePoints', folder: 'time-points', spec: { id: 'id', name: 'string', dateLabel: 'string?', order: 'number' }, texts: ['note'], names: ['name'] },
+  {
+    key: 'timePoints',
+    folder: 'time-points',
+    spec: { id: 'id', name: 'string', dateLabel: 'string?', order: 'number', background: { id: 'id', file: 'string', x: 'number', y: 'number', width: 'positive', note: 'string?' } },
+    texts: ['note'],
+    names: ['name'],
+  },
   { key: 'persons', folder: 'persons', spec: NAMED, texts: ['description', 'note'], names: ['name'] },
   { key: 'groups', folder: 'groups', spec: NAMED, texts: ['description', 'note'], names: ['name'] },
   {
@@ -113,7 +119,9 @@ const ordered = (value: Record<string, unknown>, spec: Spec): Record<string, unk
   for (const [key, field] of Object.entries(spec)) {
     const v = value[key]
     if (v === undefined) continue
-    out[key] = Array.isArray(field) ? (v as Record<string, unknown>[]).map((item) => ordered(item, field[0])) : field.startsWith('timing') ? orderTiming(v) : v
+    if (Array.isArray(field)) out[key] = (v as Record<string, unknown>[]).map((item) => ordered(item, field[0]))
+    else if (typeof field === 'object') out[key] = ordered(v as Record<string, unknown>, field)
+    else out[key] = field.startsWith('timing') ? orderTiming(v) : v
   }
   return out
 }
@@ -148,7 +156,7 @@ type Ref = { kind: RefKind; id: string }
 const COLOR = /^#[0-9a-f]{6}$/i
 
 function check(value: unknown, field: Spec[string], where: string, refs: Ref[]): string | undefined {
-  const optional = typeof field === 'string' && field.endsWith('?')
+  const optional = typeof field === 'string' ? field.endsWith('?') : !Array.isArray(field)
   if (value === undefined) return optional ? undefined : `${where} fehlt`
   const type = typeof field === 'string' ? (field.replace('?', '') as Scalar) : field
   if (Array.isArray(type)) {
@@ -159,9 +167,12 @@ function check(value: unknown, field: Spec[string], where: string, refs: Ref[]):
     }
     return undefined
   }
+  if (typeof type === 'object') return checkObject(value, type, where, refs)
   switch (type) {
     case 'number':
       return typeof value === 'number' && Number.isFinite(value) ? undefined : `${where} ist keine Zahl`
+    case 'positive':
+      return typeof value === 'number' && value > 0 && Number.isFinite(value) ? undefined : `${where} ist keine Zahl größer 0`
     case 'boolean':
       return typeof value === 'boolean' ? undefined : `${where} ist nicht true/false`
     case 'strength':

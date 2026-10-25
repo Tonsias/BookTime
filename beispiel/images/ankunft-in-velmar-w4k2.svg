@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1100" viewBox="-11 -11 22 22">
+  <rect x="-11" y="-11" width="22" height="22" fill="#3d5f7d"/>
+  <path d="M-11 -3.2 C-9.5 -3.8 -8.6 -4.6 -8.4 -6 C-8.2 -7.4 -6.6 -8.8 -4.6 -9.2 C-2.4 -9.6 -1 -11 1.2 -11 L11 -11 L11 11 L-11 11 Z" fill="#c8b88e"/>
+  <path d="M-11 -2.4 C-9.2 -3 -8 -3.9 -7.7 -5.4 C-7.4 -6.9 -5.9 -8.1 -4.3 -8.4 C-2.1 -8.8 -0.4 -10.2 1.6 -10.4" fill="none" stroke="#e3d6b0" stroke-width="0.25"/>
+  <g fill="#6f9258">
+    <ellipse cx="-5" cy="2.6" rx="4.1" ry="3.3"/>
+    <ellipse cx="-2.6" cy="4.4" rx="2" ry="1.6"/>
+  </g>
+  <g fill="#557544">
+    <circle cx="-6.6" cy="1.4" r="0.45"/><circle cx="-5.4" cy="0.9" r="0.4"/><circle cx="-4.1" cy="1.6" r="0.45"/>
+    <circle cx="-7.2" cy="2.9" r="0.4"/><circle cx="-3.3" cy="2.7" r="0.4"/><circle cx="-6" cy="4" r="0.45"/>
+    <circle cx="-4.5" cy="4.3" r="0.4"/><circle cx="-2.4" cy="4.6" r="0.4"/><circle cx="-5.2" cy="5.2" r="0.35"/>
+  </g>
+  <g fill="#9c8c78" stroke="#7d6f5f" stroke-width="0.1">
+    <path d="M6 -4.2 L7.2 -6.4 L8.4 -4.2 Z"/>
+    <path d="M7.6 -3.4 L9 -6 L10.4 -3.4 Z"/>
+    <path d="M8.2 -1.2 L9.3 -3.2 L10.4 -1.2 Z"/>
+    <path d="M2.8 -5.6 L3.8 -7.2 L4.8 -5.6 Z"/>
+  </g>
+  <path d="M7.4 -4.4 C6 -3 5.6 -0.6 3.6 0.6 C1.6 1.8 0.2 -1 -1.6 -3.2 C-3 -4.9 -4.6 -6.4 -5.6 -7.9" fill="none" stroke="#3d5f7d" stroke-width="0.3" stroke-linecap="round"/>
+  <g fill="none" stroke="#8a6e4b" stroke-width="0.14" stroke-dasharray="0.45 0.3">
+    <path d="M-6 -6 C-2 -5.4 1.8 -3.6 5 -2.5"/>
+    <path d="M-6 -6 C-6.2 -3.5 -5.6 -0.6 -5 2.5"/>
+    <path d="M-5 2.5 C-2 4.8 1.8 6.2 5 7"/>
+    <path d="M5 -2.5 C5.8 0.6 5.6 3.8 5 7"/>
+  </g>
+  <g fill="#b3a27a">
+    <ellipse cx="2.4" cy="8.4" rx="1.6" ry="0.7"/>
+    <ellipse cx="8" cy="8.2" rx="1.8" ry="0.8"/>
+  </g>
+  <g transform="translate(8.6 -8.6)" fill="#5a4a36">
+    <path d="M0 -1.2 L0.3 0 L0 1.2 L-0.3 0 Z"/>
+    <path d="M-1.2 0 L0 0.3 L1.2 0 L0 -0.3 Z" opacity="0.6"/>
+  </g>
+</svg>

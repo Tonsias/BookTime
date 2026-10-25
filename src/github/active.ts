@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Book } from '../model'
 import { filesToBook, type LoadError } from '../storage/format'
-import { sampleFiles } from '../storage/sample'
+import { sampleFiles, sampleImages } from '../storage/sample'
 import { GitHub } from './api'
 import { activeRepo, copies, imageCache, token } from './store'
 
@@ -13,7 +13,7 @@ export interface ActiveBook {
   imageUrl: (file: string) => Promise<string | undefined>
 }
 
-const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles), repo: null, imageUrl: async () => undefined })
+const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles), repo: null, imageUrl: async (file) => sampleImages[file] })
 
 async function loadActive(): Promise<ActiveBook> {
   const repo = activeRepo.get()

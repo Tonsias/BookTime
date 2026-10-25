@@ -1,13 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, type ComponentRef, type ReactNode } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { CameraControls, Edges, Line } from '@react-three/drei'
-import { DoubleSide, Group, Plane, Quaternion, Vector3 } from 'three'
-import { covers, elementColor, factsAt, phaseAt, type Book, type Selection, type TimePoint, type View } from '../model'
+import { CameraControls, Edges, Line, useTexture } from '@react-three/drei'
+import { DoubleSide, Group, Plane, Quaternion, SRGBColorSpace, Vector3 } from 'three'
+import { backgroundAt, covers, elementColor, factsAt, phaseAt, type Book, type Selection, type TimePoint, type View } from '../model'
 import { LAYER_SIZE, SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
 
 interface SceneProps {
   book: Book
+  imageUrl: (file: string) => Promise<string | undefined>
   points: TimePoint[]
   layout: Layout
   current: number
@@ -27,7 +28,7 @@ const setCursor = (pointer: boolean) => () => {
 
 /** 3D-Raum-Zeit-Würfel: Ebenen je Zeitpunkt, Personen als Stränge, Orte als Ringe, Beziehungen als Kanten, Events als Marker */
 export function Scene(props: SceneProps) {
-  const { book, points, layout, current, view, selection, focus, onSelect, onJump } = props
+  const { book, imageUrl, points, layout, current, view, selection, focus, onSelect, onJump } = props
   const selectedId = selection?.id ?? null
   const count = points.length
   const color = (id: string) => elementColor(book, id)
@@ -65,6 +66,12 @@ export function Scene(props: SceneProps) {
       {visible.map((i) => (
         <Layer key={points[i].id} index={i} title={points[i].name} active={i === current} opacity={sliceOpacity(i)} onJump={onJump} />
       ))}
+      {visible.map((i) => {
+        const background = backgroundAt(book, i)
+        if (!background || view === 'zeit' || (view === 'netz' && i !== current)) return null
+        const { file, x, y, width } = background
+        return <Backdrop key={i} file={file} imageUrl={imageUrl} position={slicePoint(i, [x, y])} width={width} opacity={i === current ? 0.4 : 0.12} />
+      })}
 
       {book.places.map((place) => (
         <Track
@@ -223,6 +230,32 @@ function Layer(props: { index: number; title: string; active: boolean; opacity: 
         </button>
       </Html>
     </group>
+  )
+}
+
+function Backdrop(props: { file: string; imageUrl: SceneProps['imageUrl']; position: Vector3; width: number; opacity: number }) {
+  const { file, imageUrl } = props
+  const [url, setUrl] = useState<string>()
+  useEffect(() => {
+    imageUrl(file).then(setUrl)
+  }, [file, imageUrl])
+  return url ? (
+    <Suspense fallback={null}>
+      <BackdropPlane {...props} url={url} />
+    </Suspense>
+  ) : null
+}
+
+function BackdropPlane({ url, position, width, opacity }: { url: string; position: Vector3; width: number; opacity: number }) {
+  const texture = useTexture(url, (t) => {
+    t.colorSpace = SRGBColorSpace
+  })
+  const { width: w, height: h } = texture.image as { width: number; height: number }
+  return (
+    <mesh position={position} rotation={[0, -Math.PI / 2, 0]} renderOrder={-1} raycast={noRaycast}>
+      <planeGeometry args={[width, (width * h) / w]} />
+      <meshBasicMaterial map={texture} transparent opacity={opacity} side={DoubleSide} depthWrite={false} />
+    </mesh>
   )
 }
 

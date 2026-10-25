@@ -2,5 +2,12 @@
   "id": "eq81",
   "name": "Ankunft in Velmar",
   "dateLabel": "Frühling, Jahr 412",
-  "order": 1
+  "order": 1,
+  "background": {
+    "id": "w4k2",
+    "file": "images/ankunft-in-velmar-w4k2.svg",
+    "x": 0,
+    "y": 0,
+    "width": 22
+  }
 }

@@ -2,6 +2,8 @@
 
 Status: **akzeptiert (2026-10-18)**
 
+Erweitert durch [2026-10-zeitpunkt-hintergrund.md](2026-10-zeitpunkt-hintergrund.md) (Hintergrundbild für Zeitpunkte).
+
 Ziel: ein fachliches Modell für Personen, Gruppen, Orte, Events und Zeit, unabhängig von Datenbank und
 Darstellung. Das Datenbank-Schema und die Oberfläche folgen erst nach Freigabe dieses Modells.
 

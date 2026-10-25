@@ -46,7 +46,7 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 ## Struktur
 
 - `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
-  Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`)
+  Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`, `backgroundAt`)
 - `src/storage/` – Dateiformat eines Buchs (`bookToFiles`, `filesToBook` mit Prüfung) nach
   `docs/2026-10-speicherung-github.md`, Beispielbuch aus `beispiel/`
 - `src/github/` – eigene Seite `github.html`: Token, Bücher, Arbeitskopie (IndexedDB), Commit, Push, Pull Request
