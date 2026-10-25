@@ -5,6 +5,10 @@ Status: **akzeptiert (2026-10-25)**. Erweitert `docs/2026-10-datenmodell.md` und
 Ziel: Ein Zeitpunkt kann ein Hintergrundbild halten, zum Beispiel eine Weltkarte. Die Karte liegt in der
 3D-Szene unter dem Netz und passt zu den Koordinaten der Orte.
 
+## Umsetzungsstand (2026-10-25)
+
+Alle Festlegungen sind umgesetzt.
+
 ## Festlegungen
 
 | # | Festlegung | Begründung |

@@ -19,12 +19,28 @@ Die Entscheidungen wurden einzeln per Rückfrage getroffen.
 | 10 | GitHub-Seite prüft nur bei geänderter Arbeitskopie neu, das Modell hält **Indizes pro Buch** | Kein Neuberechnen bei jedem Tastendruck, schnelles Nachschlagen |
 | 11 | Das Token bleibt **dauerhaft** im Speicher von `tonsias.github.io` | Alle Pages-Seiten unter dieser Adresse sind eigene Seiten des Nutzers. Technisch könnte jede von ihnen den Speicher lesen, das Risiko ist bewusst akzeptiert |
 
+## Zweite Runde
+
+| # | Festlegung | Begründung |
+|---|---|---|
+| 12 | GraphQL-Antworten ohne oder mit gekürztem Text werden **einzeln über die REST-API nachgeladen** | Dateien fehlen nicht mehr still |
+| 13 | Bilder und Hintergründe, deren Datei im Repo fehlt, sind ein **Hinweis** | Passt zu „Hinweise statt Verbote“ |
+| 14 | Bücherliste und IndexedDB sind gegen kaputte Daten und blockierte Öffnung abgesichert, Bild-Adressen werden freigegeben | Robustheit |
+| 15 | Arbeitskopie wird **pro Datei** gespeichert (IndexedDB Version 2, bestehende Kopien werden übernommen) | Eine Änderung schreibt nur ihre Datei |
+| 16 | **Atomarer Push-Abschluss**: Ein abgebrochener Push wird beim nächsten Versuch nur abgeschlossen. Ausweichbranches (`…-2`) werden nach dem Merge gelöscht | Keine doppelten Commits, keine wachsenden Branches |
+| 17 | Markdown wird mit **react-markdown** dargestellt, rohes HTML bleibt aus | Festlegung 12 des Datenmodells, sicher gegen eingeschleusten Code |
+| 18 | Szene für **große Bücher** (300 Personen, 100 Orte, 60 Zeitpunkte, 1000 Beziehungen): Marker als Instanced Meshes, Beziehungen als gebündelte Linien, eine gemeinsame Beschriftungsebene | Gemessen 4 → 60 Bilder/s im Produktions-Build |
+| 19 | Aufräumen: totes `createBlob` entfernt, `active.ts` nach `src/storage/`, `View` und `Selection` nach `src/ui/types.ts`, Fakt-Arten ausdrücklich statt über das End-„s“ | Weniger Überraschungen im Code |
+| 20 | **Umsetzungsstand** je Festlegung steht in jedem Dokument unter `docs/` | Doku und Code stimmen überein |
+
 ## Nicht umgesetzt
 
 | Empfehlung | Stand |
 |---|---|
 | Mehrere offene Tabs gegeneinander abgleichen | nicht gewählt |
 | Export nicht gepushter Änderungen als Datei | nicht gewählt |
+| Szene: Reaktionszeit beim Zeitschritt und bei Auswahl (großes Buch etwa 320 ms) | offen, nächster Schritt wäre, nur geänderte Ebenen neu aufzubauen |
+| Tests für die Speicherung pro Datei und die Markdown-Darstellung | offen, bräuchten weitere Test-Abhängigkeiten (IndexedDB-Nachbau, DOM-Umgebung) |
 | Eigener Origin (Organisation oder Domain) | abgelehnt, siehe Festlegung 11 |
 | Szenen-Vorschlag (Gruppen und Events ohne Ort sichtbar, große Bücher) | nicht gewählt |
 | Hinweise auf der GitHub-Seite | nicht gewählt |

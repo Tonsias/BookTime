@@ -4,6 +4,22 @@ Status: **akzeptiert (2026-10-18)**
 
 Erweitert durch [2026-10-zeitpunkt-hintergrund.md](2026-10-zeitpunkt-hintergrund.md) (Hintergrundbild für Zeitpunkte).
 
+## Umsetzungsstand (2026-10-25)
+
+Es gibt noch keinen Editor in der App. Alles, was beim Bearbeiten greift, wirkt heute nur über Dateien.
+
+| Festlegung | Stand |
+|---|---|
+| 1 Zeitpunkt, 2 Zeitangaben, 3 Zustände statt Änderungen | umgesetzt (`src/model.ts`) |
+| 4 Gruppen | Modell umgesetzt; in der 3D-Szene sind Gruppen und ihre Beziehungen noch nicht sichtbar |
+| 5 Ergebnis eines Events, 6 Teilnahme, 7 Beziehungsarten, 8 Verlauf einer Beziehung | umgesetzt |
+| 9 Orte, 10 Aufenthalte und Reisen | umgesetzt; Events ohne Ort sind in der Szene nicht sichtbar |
+| 11 Bilder | umgesetzt (Anzeige); Hinzufügen offen, braucht den Editor |
+| 12 Notiz und Beschreibung | umgesetzt, Markdown wird formatiert dargestellt |
+| 13 IDs und Reihenfolge | umgesetzt |
+| 14 Prüfungen | umgesetzt (`src/checks.ts`): Hinweise in Fokus-Panel und Werkzeugleiste; die Verbote sind Ladefehler, weil noch nicht in der App bearbeitet wird |
+| 15 Farben | Pflichtfeld umgesetzt; Palettenvorschlag beim Anlegen offen, braucht den Editor |
+
 Ziel: ein fachliches Modell für Personen, Gruppen, Orte, Events und Zeit, unabhängig von Datenbank und
 Darstellung. Das Datenbank-Schema und die Oberfläche folgen erst nach Freigabe dieses Modells.
 

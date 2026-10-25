@@ -7,6 +7,17 @@ GitHub Page, lädt das Buch über die GitHub-API, bearbeitet eine Arbeitskopie i
 Änderungsansicht mit Commit, Push und Pull Request. Mitautoren sind Collaborators des Repos, die
 Historie liefert git. Der Agent kann mit dem Format direkt arbeiten, ohne Zugang zu fremden Diensten.
 
+## Umsetzungsstand (2026-10-25)
+
+Alle Festlegungen sind umgesetzt. Ohne Editor entstehen Änderungen noch außerhalb der App, daher wirken
+drei nur teilweise:
+
+| Festlegung | Stand |
+|---|---|
+| 5 Arbeitskopie automatisch gespeichert | Speicherung umgesetzt (pro Datei), Änderungen kommen erst mit dem Editor |
+| 14 Umbenennen bei Namensänderung | Dateinamen werden aus den Namen gebildet, greift beim Speichern aus dem Editor |
+| 17 Größe noch nicht gepushter Bilder | offen, Bilder hinzufügen braucht den Editor; die Repo-Größe wird angezeigt |
+
 ## Festlegungen
 
 | # | Festlegung | Begründung |
