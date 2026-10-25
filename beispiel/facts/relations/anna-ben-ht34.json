@@ -1,0 +1,35 @@
+{
+  "id": "ht34",
+  "from": "u1ii",
+  "to": "pnu0",
+  "phases": [
+    {
+      "id": "1m67",
+      "timing": {
+        "at": "eq81"
+      },
+      "type": "ja9t",
+      "strength": 4
+    },
+    {
+      "id": "tsnp",
+      "timing": {
+        "from": "k82l",
+        "to": "serm"
+      },
+      "type": "01xl",
+      "strength": 3,
+      "causedBy": "ryfs"
+    },
+    {
+      "id": "ok0o",
+      "timing": {
+        "at": "3pte"
+      },
+      "type": "ja9t",
+      "strength": 3,
+      "causedBy": "mar3",
+      "note": "Ben gesteht den Diebstahl."
+    }
+  ]
+}

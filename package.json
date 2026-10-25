@@ -11,7 +11,8 @@
     "check:dead": "knip",
     "check:dup": "jscpd",
     "check:docs": "node scripts/check-docs.mjs --min-exports=100 --max-comments=5",
-    "check": "npm run lint && npm run check:dead && npm run check:dup && npm run check:docs"
+    "check": "npm run lint && npm run check:dead && npm run check:dup && npm run check:docs && npm run check:beispiel",
+    "check:beispiel": "node scripts/check-beispiel.mjs"
   },
   "dependencies": {
     "@mantine/core": "^9.7.3",

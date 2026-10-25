@@ -1,0 +1,25 @@
+{
+  "id": "em82",
+  "from": "3f0v",
+  "to": "u1ii",
+  "phases": [
+    {
+      "id": "lra8",
+      "timing": {
+        "at": "u287"
+      },
+      "type": "01xl",
+      "strength": 2
+    },
+    {
+      "id": "789a",
+      "timing": {
+        "from": "serm",
+        "to": "3pte"
+      },
+      "type": "ja9t",
+      "strength": 4,
+      "note": "Ilya rettet Anna vor Kaels Spähern."
+    }
+  ]
+}

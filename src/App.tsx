@@ -1,25 +1,30 @@
 import { useMemo, useState } from 'react'
-import { ActionIcon, Button, Group, Kbd, Paper, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Anchor, Button, Group, Kbd, Paper, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core'
 import { useHotkeys } from '@mantine/hooks'
 import { spotlight } from '@mantine/spotlight'
+import { useActiveBook, type ActiveBook } from './github/active'
 import { focusSet, timeline, type Selection, type View } from './model'
-import { sampleBook } from './sampleBook'
 import { computeLayout } from './scene/layout'
 import { Scene } from './scene/Scene'
 import { FocusPanel } from './ui/FocusPanel'
 import { Search } from './ui/Search'
 
-const book = sampleBook
-
-/** Hauptansicht: 3D-Szene mit Werkzeugleiste, Zeitregler, Fokus-Panel und Suche */
+/** Hauptansicht: lädt das aktive Buch und zeigt es */
 function App() {
+  const active = useActiveBook()
+  return active ? <BookView active={active} /> : null
+}
+
+/** 3D-Szene mit Werkzeugleiste, Zeitregler, Fokus-Panel und Suche */
+function BookView({ active }: { active: ActiveBook }) {
+  const { book } = active
   const [view, setView] = useState<View>('raum')
   const [current, setCurrent] = useState(0)
   const [selection, setSelection] = useState<Selection | null>(null)
 
-  const points = useMemo(() => timeline(book), [])
-  const layout = useMemo(() => computeLayout(book, points.length), [points])
-  const focus = useMemo(() => focusSet(book, selection), [selection])
+  const points = useMemo(() => timeline(book), [book])
+  const layout = useMemo(() => computeLayout(book, points.length), [book, points])
+  const focus = useMemo(() => focusSet(book, selection), [book, selection])
 
   const last = points.length - 1
   const point = points[current]
@@ -37,7 +42,22 @@ function App() {
 
       <Paper className="overlay toolbar" p="md" radius="md" withBorder shadow="lg">
         <Stack gap="sm">
-          <Title order={4}>{book.title}</Title>
+          <div>
+            <Title order={4}>{book.title}</Title>
+            <Group gap="xs">
+              <Text size="xs" c="dimmed">
+                {active.repo ?? 'Beispielbuch'}
+              </Text>
+              <Anchor href="github.html" size="xs">
+                GitHub
+              </Anchor>
+            </Group>
+            {active.errors.length > 0 && (
+              <Anchor href="github.html" size="xs" c="red">
+                {active.errors.length} Dateien fehlerhaft
+              </Anchor>
+            )}
+          </div>
           <SegmentedControl
             value={view}
             onChange={(v) => {
@@ -67,7 +87,7 @@ function App() {
         </Stack>
       </Paper>
 
-      {selection && <FocusPanel book={book} points={points} current={current} selection={selection} onSelect={setSelection} onJump={setCurrent} />}
+      {selection && <FocusPanel book={book} imageUrl={active.imageUrl} points={points} current={current} selection={selection} onSelect={setSelection} onJump={setCurrent} />}
 
       <Paper className="overlay timebar" p="md" radius="md" withBorder shadow="lg">
         <Text size="sm" fw={600}>

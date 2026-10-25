@@ -1,0 +1,8 @@
+{
+  "id": "0jsn",
+  "name": "Elternteil von",
+  "category": "Familie",
+  "directed": true,
+  "inverseName": "Kind von",
+  "color": "#c084fc"
+}

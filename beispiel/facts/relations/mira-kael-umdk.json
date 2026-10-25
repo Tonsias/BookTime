@@ -1,0 +1,26 @@
+{
+  "id": "umdk",
+  "from": "ivlm",
+  "to": "u55z",
+  "phases": [
+    {
+      "id": "xqxj",
+      "timing": {
+        "from": "eq81",
+        "to": "u287"
+      },
+      "type": "b2rk",
+      "strength": 4
+    },
+    {
+      "id": "zg8e",
+      "timing": {
+        "from": "serm",
+        "to": "3pte"
+      },
+      "type": "b8jp",
+      "strength": 5,
+      "causedBy": "6e3b"
+    }
+  ]
+}

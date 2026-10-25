@@ -35,6 +35,7 @@ manuell).
 | Dead Code | `npm run check:dead` (knip) | keine ungenutzten Dateien, Exporte, Typen oder Abhängigkeiten |
 | Duplikate | `npm run check:dup` (jscpd, `.jscpd.json`) | höchstens 3 % duplizierter Code in `src/` |
 | Doku | `npm run check:docs` (`scripts/check-docs.mjs`) | jeder Export hat JSDoc (100 %); alle Kommentare inkl. JSDoc höchstens 5 % der Zeilen |
+| Beispielbuch | `npm run check:beispiel` (`scripts/check-beispiel.mjs`) | `beispiel/` lädt ohne Fehler und wird unverändert zurückgeschrieben |
 
 Dokumentation bewusst minimal halten: JSDoc möglichst einzeilig und nur das Warum/Was, das der Name
 nicht schon sagt; Inline-Kommentare nur, wo der Code allein nicht verständlich ist.
@@ -46,7 +47,10 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 
 - `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
   Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`)
-- `src/sampleBook.ts` – Beispieldaten
+- `src/storage/` – Dateiformat eines Buchs (`bookToFiles`, `filesToBook` mit Prüfung) nach
+  `docs/2026-10-speicherung-github.md`, Beispielbuch aus `beispiel/`
+- `src/github/` – eigene Seite `github.html`: Token, Bücher, Arbeitskopie (IndexedDB), Commit, Push, Pull Request
+- `beispiel/` – Beispielbuch im Repo-Format, wird von `npm run check` geprüft
 - `src/scene/` – 3D-Szene und Layout (Zeit = x-Achse, Netz = y/z-Ebene)
 - `src/ui/` – Mantine-Oberfläche (Fokus-Panel, Suche)
 - `docs/` – akzeptierte Vorschläge

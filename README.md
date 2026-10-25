@@ -25,6 +25,15 @@ begrenzt, Fakten wie Aufenthalt, Reise, Teilnahme, Mitgliedschaft und Beziehung 
 Orte können in Orten liegen und ihre Position über die Zeit ändern. Details und Begründungen:
 [docs/2026-10-datenmodell.md](docs/2026-10-datenmodell.md).
 
+## Bücher in GitHub
+
+Ein Buch ist ein Ordner aus JSON- und Markdown-Dateien in einem privaten GitHub-Repo, eine Datei pro
+Element und Fakt. Das Format zeigt das Beispielbuch in [`beispiel/`](beispiel/). Auf der Seite
+**GitHub** (`github.html`) trägt man ein fine-grained Token ein (nur die Buch-Repos, Contents und Pull
+requests mit Lesen und Schreiben), fügt Bücher per `owner/repo` hinzu und lädt sie. Die Arbeitskopie liegt
+im Browser. Von dort gehen Commits auf einen eigenen Arbeitsbranch und per Pull Request nach `main`.
+Details: [docs/2026-10-speicherung-github.md](docs/2026-10-speicherung-github.md).
+
 ## Entwicklung
 
 Stack: React, Vite, TypeScript, [Mantine](https://mantine.dev), [React Three Fiber](https://r3f.docs.pmnd.rs).
@@ -33,7 +42,7 @@ Stack: React, Vite, TypeScript, [Mantine](https://mantine.dev), [React Three Fib
 npm install
 npm run dev      # Dev-Server
 npm run build    # Typecheck + Produktions-Build nach dist/
-npm run check    # Lint, Dead Code, Duplikate, Doku – muss vor jedem Push fehlerfrei laufen
+npm run check    # Lint, Dead Code, Duplikate, Doku, Beispielbuch – muss vor jedem Push fehlerfrei laufen
 ```
 
 Bekannte, bewusst akzeptierte Konsolenmeldung: `THREE.Clock: This module has been deprecated` kommt aus

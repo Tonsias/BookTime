@@ -1,0 +1,16 @@
+{
+  "id": "rc2s",
+  "name": "Burg Ostfels",
+  "color": "#a78bfa",
+  "existence": {},
+  "images": [],
+  "phases": [
+    {
+      "id": "25w0",
+      "timing": {},
+      "x": 5,
+      "y": 2.5,
+      "images": []
+    }
+  ]
+}

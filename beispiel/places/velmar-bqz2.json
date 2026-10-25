@@ -1,0 +1,17 @@
+{
+  "id": "bqz2",
+  "name": "Velmar",
+  "color": "#38bdf8",
+  "existence": {},
+  "images": [],
+  "radius": 3.2,
+  "phases": [
+    {
+      "id": "tcsf",
+      "timing": {},
+      "x": -6,
+      "y": 6,
+      "images": []
+    }
+  ]
+}

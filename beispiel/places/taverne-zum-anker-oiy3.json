@@ -1,0 +1,18 @@
+{
+  "id": "oiy3",
+  "name": "Taverne zum Anker",
+  "color": "#7dd3fc",
+  "existence": {},
+  "images": [],
+  "radius": 1,
+  "phases": [
+    {
+      "id": "h8yu",
+      "timing": {},
+      "parent": "bqz2",
+      "x": 1.8,
+      "y": -1.4,
+      "images": []
+    }
+  ]
+}

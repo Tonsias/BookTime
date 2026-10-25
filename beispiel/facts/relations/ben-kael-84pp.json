@@ -1,0 +1,27 @@
+{
+  "id": "84pp",
+  "from": "pnu0",
+  "to": "u55z",
+  "phases": [
+    {
+      "id": "0kug",
+      "timing": {
+        "from": "k82l",
+        "to": "serm"
+      },
+      "type": "nje3",
+      "strength": 2,
+      "causedBy": "ryfs",
+      "note": "Kael bezahlt Ben für den Brief."
+    },
+    {
+      "id": "p4f0",
+      "timing": {
+        "at": "3pte"
+      },
+      "type": "dt6e",
+      "strength": 4,
+      "causedBy": "mar3"
+    }
+  ]
+}

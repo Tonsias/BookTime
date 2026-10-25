@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Anchor, Badge, Box, CloseButton, Group, Image, Paper, ScrollArea, Stack, Text, Timeline, Title } from '@mantine/core'
 import {
   bounds,
@@ -23,6 +23,7 @@ import {
 
 interface FocusPanelProps {
   book: Book
+  imageUrl: (file: string) => Promise<string | undefined>
   points: TimePoint[]
   current: number
   selection: Selection
@@ -66,15 +67,7 @@ export function FocusPanel(props: FocusPanelProps) {
             </Group>
             <Markdown dimmed>{found.element.description}</Markdown>
           </div>
-          {image ? (
-            <Image src={image.file} radius="sm" alt={found.label} />
-          ) : (
-            <Box className="image-placeholder">
-              <Text size="xs" c="dimmed">
-                Kein Bild zu diesem Zeitpunkt
-              </Text>
-            </Box>
-          )}
+          <BookImage file={image?.file} alt={found.label} imageUrl={props.imageUrl} />
           {found.kind === 'event' ? <EventDetails {...props} event={found.element as StoryEvent} /> : <ElementDetails {...props} kind={found.kind} />}
           {found.element.note && (
             <Section title="Notiz">
@@ -84,6 +77,23 @@ export function FocusPanel(props: FocusPanelProps) {
         </Stack>
       </ScrollArea.Autosize>
     </Paper>
+  )
+}
+
+function BookImage({ file, alt, imageUrl }: { file?: string; alt: string; imageUrl: FocusPanelProps['imageUrl'] }) {
+  const [loaded, setLoaded] = useState<{ file: string; url?: string }>()
+  useEffect(() => {
+    if (file) imageUrl(file).then((url) => setLoaded({ file, url }))
+  }, [file, imageUrl])
+  const url = loaded?.file === file ? loaded?.url : undefined
+  return url ? (
+    <Image src={url} radius="sm" alt={alt} />
+  ) : (
+    <Box className="image-placeholder">
+      <Text size="xs" c="dimmed">
+        {file && loaded?.file !== file ?'Bild wird geladen …' : 'Kein Bild zu diesem Zeitpunkt'}
+      </Text>
+    </Box>
   )
 }
 
