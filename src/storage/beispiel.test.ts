@@ -17,7 +17,7 @@ const { book, errors } = filesToBook(files, others)
 
 it('Beispielbuch lädt ohne Fehler und Hinweise', () => {
   expect(errors).toEqual([])
-  expect(hints(book)).toEqual([])
+  expect(hints(book, others)).toEqual([])
 })
 
 it('Beispielbuch wird unverändert zurückgeschrieben', () => {

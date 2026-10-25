@@ -87,6 +87,15 @@ describe('Hinweise', () => {
     expect(hints(book).map((h) => h.text)).toEqual(['Zwei gleiche ungerichtete Beziehungen überschneiden sich'])
   })
 
+  it('meldet Bilder und Hintergründe, die im Repo fehlen', () => {
+    const book = base({
+      timePoints: [{ ...point('t1', 1), background: { id: 'h', file: 'images/karte-hhhh.svg', x: 0, y: 0, width: 10 } }],
+      persons: [{ id: 'p', name: 'Pia', color: '#000000', description: '', existence: {}, images: [{ id: 'i', file: 'images/pia-iiii.png', order: 0 }] }],
+    })
+    expect(hints(book, ['images/pia-iiii.png']).map((h) => h.text)).toEqual(['Hintergrund images/karte-hhhh.svg fehlt im Repo'])
+    expect(hints(book)).toEqual([])
+  })
+
   it('erkennt Lücken in den Orts-Phasen', () => {
     const phases = [{ id: 'x', timing: { at: 't1' }, x: 0, y: 0, images: [] }]
     expect(hints(base({ places: [place('a', { phases })] })).map((h) => [h.at, h.text])).toEqual([[1, 'a hat zu dieser Zeit keine Lage']])

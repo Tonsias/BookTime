@@ -63,29 +63,37 @@ export class GitHub {
     return this.request(`/{repo}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha, force: mode === 'force' } })
   }
 
+  /** Löscht einen Branch */
+  deleteBranch(branch: string) {
+    return this.request(`/{repo}/git/refs/heads/${branch}`, { method: 'DELETE' })
+  }
+
   /** Alle Dateien eines Commits mit Blob-SHA und Größe */
   async tree(commitSha: string) {
     const { tree } = await this.request<{ tree: { path: string; type: string; sha: string; size: number }[] }>(`/{repo}/git/trees/${commitSha}?recursive=1`)
     return tree.filter((entry) => entry.type === 'blob')
   }
 
-  /** Textinhalte vieler Dateien eines Commits, gebündelt über GraphQL */
-  async texts(commitSha: string, paths: string[]) {
+  /** Textinhalte vieler Dateien eines Commits, gebündelt über GraphQL; gekürzte oder fehlende einzeln nachgeladen */
+  async texts(commitSha: string, files: { path: string; sha: string }[]) {
     const [owner, name] = this.repo.split('/')
     const result: Record<string, string> = {}
-    for (let i = 0; i < paths.length; i += 100) {
-      const batch = paths.slice(i, i + 100)
-      const fields = batch.map((path, j) => `f${j}: object(expression: ${JSON.stringify(`${commitSha}:${path}`)}) { ... on Blob { text } }`)
+    for (let i = 0; i < files.length; i += 100) {
+      const batch = files.slice(i, i + 100)
+      const fields = batch.map(({ path }, j) => `f${j}: object(expression: ${JSON.stringify(`${commitSha}:${path}`)}) { ... on Blob { text isTruncated } }`)
       const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { ${fields.join(' ')} } }`
-      const { data, errors } = await this.request<{ data?: { repository: Record<string, { text: string } | null> }; errors?: { message: string }[] }>('/graphql', {
+      const { data, errors } = await this.request<{
+        data?: { repository: Record<string, { text: string | null; isTruncated?: boolean } | null> }
+        errors?: { message: string }[]
+      }>('/graphql', {
         method: 'POST',
         body: { query },
       })
       if (errors?.[0]) throw new GitHubError(400, errors[0].message)
-      batch.forEach((path, j) => {
-        const text = data?.repository[`f${j}`]?.text
-        if (text !== undefined) result[path] = text
-      })
+      for (const [j, { path, sha }] of batch.entries()) {
+        const blob = data?.repository[`f${j}`]
+        result[path] = blob && typeof blob.text === 'string' && !blob.isTruncated ? blob.text : await (await this.blob(sha)).text()
+      }
     }
     return result
   }
@@ -94,14 +102,6 @@ export class GitHub {
   async blob(sha: string) {
     const { content } = await this.request<{ content: string }>(`/{repo}/git/blobs/${sha}`)
     return new Blob([Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0))])
-  }
-
-  /** Lädt eine Binärdatei hoch und liefert ihre Blob-SHA */
-  async createBlob(data: Blob) {
-    const bytes = new Uint8Array(await data.arrayBuffer())
-    let binary = ''
-    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-    return (await this.request<{ sha: string }>('/{repo}/git/blobs', { method: 'POST', body: { content: btoa(binary), encoding: 'base64' } })).sha
   }
 
   /** Neuer Commit aus Änderungen gegenüber dem Eltern-Commit; null löscht eine Datei */

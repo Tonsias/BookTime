@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Anchor, Badge, Box, CloseButton, Group, Image, Paper, ScrollArea, Stack, Text, Timeline, Title } from '@mantine/core'
+import { Anchor, Badge, Box, CloseButton, Group, Image, Paper, ScrollArea, Stack, Text, Timeline, Title, Typography } from '@mantine/core'
+import ReactMarkdown from 'react-markdown'
 import type { Hint } from '../checks'
 import {
   bounds,
@@ -16,11 +17,11 @@ import {
   type Fact,
   type RelationPhase,
   type Relation,
-  type Selection,
   type StoryEvent,
   type TimePoint,
   type Timing,
 } from '../model'
+import type { Selection } from './types'
 
 interface FocusPanelProps {
   book: Book
@@ -266,10 +267,11 @@ function Ref(props: FocusPanelProps & { id: string }) {
 }
 
 function Markdown({ children, dimmed }: { children: string; dimmed?: boolean }) {
+  // react-markdown erzeugt React-Elemente und lässt rohes HTML weg, Texte von Mitautoren können keinen Code einschleusen
   return (
-    <Text size="sm" c={dimmed ? 'dimmed' : undefined} mt={4} style={{ whiteSpace: 'pre-wrap' }}>
-      {children}
-    </Text>
+    <Typography className="markdown" c={dimmed ? 'dimmed' : undefined} mt={4} fz="sm">
+      <ReactMarkdown components={{ a: ({ href, children: label }) => <a href={href} target="_blank" rel="noreferrer">{label}</a> }}>{children}</ReactMarkdown>
+    </Typography>
   )
 }
 

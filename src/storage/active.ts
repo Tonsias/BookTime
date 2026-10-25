@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import type { Book } from '../model'
-import { filesToBook, firstTimePoint, type LoadError } from '../storage/format'
-import { sampleFiles, sampleImages } from '../storage/sample'
-import { GitHub } from './api'
-import { activeRepo, copies, imageCache, token } from './store'
+import { filesToBook, firstTimePoint, type LoadError } from './format'
+import { sampleFiles, sampleImages } from './sample'
+import { GitHub } from '../github/api'
+import { activeRepo, copies, imageCache, token } from '../github/store'
 
 /** Buch, das die Hauptseite anzeigt, mit Herkunft und Ladefehlern */
 export interface ActiveBook {
   book: Book
   errors: LoadError[]
   repo: string | null
+  images: string[]
   imageUrl: (file: string) => Promise<string | undefined>
 }
 
@@ -18,7 +19,7 @@ const TYPES: Record<string, string> = { svg: 'image/svg+xml', png: 'image/png', 
 // GitHub liefert Dateien ohne Typ, ohne ihn lädt der Browser z. B. kein SVG als Bild
 const imageType = (file: string) => TYPES[file.split('.').pop()!.toLowerCase()] ?? ''
 
-const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles, Object.keys(sampleImages)), repo: null, imageUrl: async (file) => sampleImages[file] })
+const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles, Object.keys(sampleImages)), repo: null, images: Object.keys(sampleImages), imageUrl: async (file) => sampleImages[file] })
 
 async function loadActive(): Promise<ActiveBook> {
   const repo = activeRepo.get()
@@ -34,11 +35,15 @@ async function loadActive(): Promise<ActiveBook> {
       blob = await new GitHub(key, repo).blob(image.sha)
       await imageCache.put(repo, image.sha, blob)
     }
-    return blob && URL.createObjectURL(new Blob([blob], { type: imageType(file) }))
+    if (!blob) return undefined
+    const url = URL.createObjectURL(new Blob([blob], { type: imageType(file) }))
+    addEventListener('pagehide', () => URL.revokeObjectURL(url), { once: true })
+    return url
   }
   return {
     ...filesToBook(copy.files, Object.keys(copy.images)),
     repo,
+    images: Object.keys(copy.images),
     imageUrl: (file) => {
       if (!urls.has(file)) urls.set(file, imageUrl(file).catch(() => undefined))
       return urls.get(file)!

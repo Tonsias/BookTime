@@ -157,15 +157,6 @@ export interface Book {
 /** Art eines auswählbaren Elements */
 export type ElementKind = 'person' | 'group' | 'place' | 'event'
 
-/** Kamera-Ansicht der 3D-Szene */
-export type View = 'raum' | 'netz' | 'zeit'
-
-/** Aktuell ausgewähltes Element */
-export interface Selection {
-  kind: ElementKind
-  id: string
-}
-
 // Bücher werden nie verändert, abgeleitete Daten lassen sich daher pro Buch zwischenspeichern
 const cached = <T>(compute: (book: Book) => T) => {
   const cache = new WeakMap<Book, T>()
@@ -306,14 +297,14 @@ export const backgroundAt = (book: Book, i: number) =>
     .findLast((t) => t.background)?.background
 
 /** Alle Elemente, die mit der Auswahl irgendwann verbunden sind */
-export function focusSet(book: Book, selection: Selection | null): Set<string> | null {
-  if (!selection) return null
-  const ids = new Set([selection.id])
+export function focusSet(book: Book, id: string | null): Set<string> | null {
+  if (!id) return null
+  const ids = new Set([id])
   for (const fact of book.facts) {
     const involved = involvedIds(fact)
-    if (involved.includes(selection.id)) involved.forEach((id) => ids.add(id))
+    if (involved.includes(id)) involved.forEach((other) => ids.add(other))
   }
-  const event = book.events.find((e) => e.id === selection.id)
+  const event = book.events.find((e) => e.id === id)
   if (event?.place) ids.add(event.place)
   return ids
 }

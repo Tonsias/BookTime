@@ -59,6 +59,26 @@ body,
   border-radius: 2px;
 }
 
+.label-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.label-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
+}
+
+.label-anchor > * {
+  display: block;
+  transform: translate(-50%, -50%);
+}
+
 .scene-label,
 .layer-label {
   font: inherit;
@@ -109,4 +129,12 @@ body,
   border: 1px dashed #3a4152;
   border-radius: 6px;
   text-align: center;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
 }

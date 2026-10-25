@@ -98,7 +98,8 @@ const KINDS: Kind[] = [
   },
 ]
 
-const isFactKind = (key: Kind['key']): key is Fact['kind'] => !key.endsWith('s')
+const FACT_KINDS: Kind['key'][] = ['stay', 'journey', 'participation', 'membership', 'relation'] satisfies Fact['kind'][]
+const isFactKind = (key: Kind['key']): key is Fact['kind'] => FACT_KINDS.includes(key)
 
 const UMLAUTS: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }
 
@@ -242,10 +243,7 @@ const ACCEPTS: Record<RefKind, Kind['key'][]> = {
   relationType: ['relationTypes'],
 }
 
-/**
- * Liest ein Buch aus Repo-Dateien; fehlerhafte Dateien werden übersprungen und aufgelistet.
- * `others` sind die übrigen Pfade im Repo (z. B. Bilder), die nur auf ihren Namen geprüft werden.
- */
+/** Liest ein Buch aus Repo-Dateien; Fehlerhaftes wird übersprungen und gelistet, `others` (Bilder) nur auf Namen geprüft */
 export function filesToBook(files: BookFiles, others: string[] = []): { book: Book; errors: LoadError[] } {
   const errors: LoadError[] = []
   let meta: Record<string, unknown> = {}

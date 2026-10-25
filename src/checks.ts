@@ -67,8 +67,8 @@ const existence = (book: Book, id: string) => {
 const factSpans = (book: Book, fact: Fact): { span: Span; causedBy?: string }[] =>
   fact.kind === 'relation' ? fact.phases.map((p) => ({ span: bounds(book, p.timing), causedBy: p.causedBy })) : [{ span: bounds(book, factTiming(book, fact)), causedBy: fact.causedBy }]
 
-/** Erlaubte Widersprüche nach Festlegung 14, je mit beteiligten Elementen und erstem betroffenen Zeitpunkt */
-export function hints(book: Book): Hint[] {
+/** Erlaubte Widersprüche nach Festlegung 14; mit `available` auch fehlende Bilder */
+export function hints(book: Book, available?: string[]): Hint[] {
   const found: Hint[] = []
   const add = (ids: string[], at: number, text: string) => found.push({ ids, at, text })
   const last = book.timePoints.length - 1
@@ -110,7 +110,20 @@ export function hints(book: Book): Hint[] {
       if (span[0] < life[0] || span[1] > life[1]) add([element.id], span[0], 'Bild gilt außerhalb der Existenz seines Elements')
     }
   }
+  if (available) missingImages(book, new Set(available), add)
   return found
+}
+
+function missingImages(book: Book, available: Set<string>, add: Add) {
+  const owned = [
+    ...[...book.persons, ...book.groups, ...book.places, ...book.events].flatMap((e) => e.images.map((image) => ({ id: e.id, image }))),
+    ...book.places.flatMap((p) => p.phases.flatMap((phase) => phase.images.map((image) => ({ id: p.id, image })))),
+  ]
+  for (const { id, image } of owned)
+    if (!available.has(image.file)) add([id], image.timing ? bounds(book, image.timing)[0] : 0, `Bild ${image.file} fehlt im Repo`)
+  timeline(book).forEach((point, i) => {
+    if (point.background && !available.has(point.background.file)) add([], i, `Hintergrund ${point.background.file} fehlt im Repo`)
+  })
 }
 
 type Add = (ids: string[], at: number, text: string) => void

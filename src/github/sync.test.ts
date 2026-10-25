@@ -46,6 +46,7 @@ class FakeGitHub {
     if (route === '/user') return [200, { login: 'tester' }]
     if (route === '') return [200, { default_branch: 'main', size: 12, permissions: { push: true } }]
     if (ref && method === 'GET') return this.refs.has(ref) ? [200, { object: { sha: this.refs.get(ref) } }] : [this.refs.size ? 404 : 409, { message: 'fehlt' }]
+    if (ref && method === 'DELETE') return [204, void this.refs.delete(ref)]
     if (ref && method === 'PATCH') {
       const fastForward = this.ancestors(body.sha as string).includes(this.refs.get(ref)!)
       if (!fastForward && !body.force) return [422, { message: 'kein Vorlauf' }]
@@ -149,5 +150,30 @@ describe('GitHub-Abläufe', () => {
     expect(copy.head).toBe(github.refs.get('main'))
     expect(copy.pullUrl).toBeUndefined()
     expect(copy.base['booktime.note.md']).toBe('Neu\n')
+  })
+
+  it('kehrt nach dem Merge eines Ausweichbranches zum Arbeitsbranch zurück', async () => {
+    let copy = await load('token', 'o/buch')
+    github.refs.set(copy.branch, github.addCommit(github.files(copy.head), [copy.head]))
+    copy = await push('token', await commitLocal({ ...copy, files: { ...copy.files, 'booktime.note.md': 'Lokal\n' } }, 'Lokal'))
+    expect(copy.branch).toMatch(/-\d+$/)
+    const fallback = copy.branch
+    copy = await openPull('token', copy)
+    github.merge(1)
+    copy = await load('token', 'o/buch')
+    expect(copy.branch).toBe('tester/arbeit')
+    expect(github.refs.has(fallback)).toBe(false)
+    expect(github.refs.get('tester/arbeit')).toBe(github.refs.get('main'))
+  })
+
+  it('schließt einen abgebrochenen Push nur noch ab', async () => {
+    let copy = await load('token', 'o/buch')
+    copy = await commitLocal({ ...copy, files: { ...copy.files, 'booktime.note.md': 'Fast fertig\n' } }, 'Abgebrochen')
+    const pushed = github.addCommit({ ...github.files(copy.head), 'booktime.note.md': 'Fast fertig\n' }, [copy.head])
+    github.refs.set(copy.branch, pushed)
+    const before = github.commits.size
+    copy = await push('token', { ...copy, pushing: { branch: copy.branch, head: pushed } })
+    expect(copy).toMatchObject({ head: pushed, commits: [], pushing: undefined })
+    expect(github.commits.size).toBe(before)
   })
 })

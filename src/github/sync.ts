@@ -28,15 +28,12 @@ export function diff(before: BookFiles, after: BookFiles): [string, ChangeKind][
   })
 }
 
-/**
- * Lädt den Arbeitsbranch eines Repos neu in die Arbeitskopie. Legt in einem leeren Repo `booktime.json`
- * an, legt den Arbeitsbranch bei Bedarf an und setzt ihn nach einem gemergten Pull Request auf den Standardbranch.
- */
+/** Lädt den Arbeitsbranch neu; richtet leere Repos ein und setzt den Branch nach einem Merge auf den Standardbranch */
 export async function load(token: string, repo: string): Promise<WorkingCopy> {
   const gh = new GitHub(token, repo)
   const [login, info, previous] = await Promise.all([gh.login(), gh.repository(), copies.get(repo)])
   if (!info.permissions?.push) throw new Error('Das Token hat kein Schreibrecht (Contents: Read and write) für dieses Repo.')
-  const branch = previous?.branch ?? `${login}/arbeit`
+  let branch = previous?.branch ?? `${login}/arbeit`
 
   let main = await gh.branchSha(info.default_branch)
   if (!main) {
@@ -53,14 +50,18 @@ export async function load(token: string, repo: string): Promise<WorkingCopy> {
   }
   const [latest] = await gh.pulls(branch)
   if (latest?.merged_at && latest.head.sha === head && head !== main) {
-    await gh.setBranch(branch, main, 'force')
+    // Ein Ausweichbranch (…-2) hat seinen Zweck erfüllt, weiter geht es auf dem Arbeitsbranch selbst
+    const stem = branch.replace(/-\d+$/, '')
+    if (stem !== branch) await gh.deleteBranch(branch)
+    await gh.setBranch(stem, main, (await gh.branchSha(stem)) ? 'force' : 'create')
+    branch = stem
     head = main
   }
 
   const tree = await gh.tree(head)
   const base = await gh.texts(
     head,
-    tree.filter((e) => isText(e.path)).map((e) => e.path),
+    tree.filter((e) => isText(e.path)),
   )
   const copy: WorkingCopy = {
     repo,
@@ -88,9 +89,16 @@ export async function commitLocal(copy: WorkingCopy, message: string) {
   return next
 }
 
-/** Überträgt die lokalen Commits; ist der Arbeitsbranch auf GitHub weiter, auf einen neuen Branch */
+const finish = async (copy: WorkingCopy, branch: string, head: string) => {
+  const next: WorkingCopy = { ...copy, branch, head, base: committed(copy), commits: [], pushing: undefined, pullUrl: branch === copy.branch ? copy.pullUrl : undefined }
+  await copies.put(next)
+  return next
+}
+
+/** Überträgt die lokalen Commits (bei Vorlauf auf GitHub auf einen neuen Branch), schließt abgebrochene Pushes ab */
 export async function push(token: string, copy: WorkingCopy) {
   const gh = new GitHub(token, copy.repo)
+  if (copy.pushing && (await gh.branchSha(copy.pushing.branch)) === copy.pushing.head) return finish(copy, copy.pushing.branch, copy.pushing.head)
   let branch = copy.branch
   const remote = await gh.branchSha(branch)
   if (remote !== copy.head) {
@@ -106,10 +114,9 @@ export async function push(token: string, copy: WorkingCopy) {
     const entries = Object.fromEntries(Object.entries(changes).map(([path, content]) => [path, content === null ? null : { content }]))
     head = await gh.commit(head, message, entries)
   }
+  await copies.put({ ...copy, pushing: { branch, head } })
   await gh.setBranch(branch, head, 'update')
-  const next: WorkingCopy = { ...copy, branch, head, base: committed(copy), commits: [], pullUrl: branch === copy.branch ? copy.pullUrl : undefined }
-  await copies.put(next)
-  return next
+  return finish(copy, branch, head)
 }
 
 /** Erstellt einen Pull Request vom Arbeitsbranch in den Standardbranch */

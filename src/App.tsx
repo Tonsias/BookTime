@@ -3,13 +3,14 @@ import { ActionIcon, Anchor, Button, Group, Kbd, Paper, Popover, SegmentedContro
 import { useHotkeys } from '@mantine/hooks'
 import { spotlight } from '@mantine/spotlight'
 import { hints, type Hint } from './checks'
-import { addFirstTimePoint, useActiveBook, type ActiveBook } from './github/active'
-import { findElement, focusSet, timeline, type Selection, type View } from './model'
+import { addFirstTimePoint, useActiveBook, type ActiveBook } from './storage/active'
+import { findElement, focusSet, timeline } from './model'
 import { computeLayout } from './scene/layout'
 import { Scene } from './scene/Scene'
 import { ErrorPage, ErrorView } from './ui/ErrorView'
 import { FocusPanel } from './ui/FocusPanel'
 import { Search } from './ui/Search'
+import type { Selection, View } from './ui/types'
 
 /** Hauptansicht: lädt das aktive Buch und zeigt es */
 function App() {
@@ -48,8 +49,8 @@ function BookView({ active }: { active: ActiveBook }) {
 
   const points = useMemo(() => timeline(book), [book])
   const layout = useMemo(() => computeLayout(book, points.length), [book, points])
-  const focus = useMemo(() => focusSet(book, selection), [book, selection])
-  const notes = useMemo(() => hints(book), [book])
+  const focus = useMemo(() => focusSet(book, selection?.id ?? null), [book, selection])
+  const notes = useMemo(() => hints(book, active.images), [book, active.images])
 
   const last = points.length - 1
   const point = points[current] ?? points[0]!
@@ -85,8 +86,9 @@ function BookView({ active }: { active: ActiveBook }) {
             <HintList
               hints={notes}
               onOpen={(hint) => {
-                const kind = findElement(book, hint.ids[0]!)?.kind
-                if (kind) setSelection({ kind, id: hint.ids[0]! })
+                const id = hint.ids[0]
+                const kind = id && findElement(book, id)?.kind
+                if (id && kind) setSelection({ kind, id })
                 setCurrent(hint.at)
               }}
             />
