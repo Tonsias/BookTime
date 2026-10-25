@@ -7,7 +7,7 @@ import { commitLocal, committed, diff, load, openPull, push } from './sync'
 
 const REPO = /^[\w.-]+\/[\w.-]+$/
 
-const megabytes = (kb: number) => `${(kb / 1024).toFixed(1)} MB`
+const size = (kb: number) => (kb < 1024 ? `${kb} KB` : `${(kb / 1024).toFixed(1)} MB`)
 
 /** Seite für alles, was mit GitHub zu tun hat: Token, Bücher, Änderungen, Commit, Push und Pull Request */
 export function GitHubPage() {
@@ -15,7 +15,7 @@ export function GitHubPage() {
   const [login, setLogin] = useState<string>()
   const [list, setList] = useState(books.get())
   const [active, setActive] = useState(activeRepo.get())
-  const [selected, setSelected] = useState<string | null>(active)
+  const [selected, setSelected] = useState<string | null>(active ?? list[0] ?? null)
   const [copy, setCopy] = useState<WorkingCopy>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
@@ -226,7 +226,7 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run }: BookS
           <Info label="Stand">
             <Code>{copy.head.slice(0, 7)}</Code>
           </Info>
-          <Info label="Repo-Größe">{megabytes(copy.repoSize)}</Info>
+          <Info label="Repo-Größe">{size(copy.repoSize)}</Info>
           <Info label="Dateien">
             {Object.keys(copy.files).length} Text, {Object.keys(copy.images).length} Bilder
           </Info>
