@@ -166,19 +166,19 @@ export interface Selection {
   id: string
 }
 
-const indexCache = new WeakMap<Book, Map<string, number>>()
+// Bücher werden nie verändert, abgeleitete Daten lassen sich daher pro Buch zwischenspeichern
+const cached = <T>(compute: (book: Book) => T) => {
+  const cache = new WeakMap<Book, T>()
+  return (book: Book): T => {
+    if (!cache.has(book)) cache.set(book, compute(book))
+    return cache.get(book) as T
+  }
+}
 
 /** Zeitpunkte in chronologischer Reihenfolge */
-export const timeline = (book: Book) => [...book.timePoints].sort((a, b) => a.order - b.order)
+export const timeline = cached((book) => [...book.timePoints].sort((a, b) => a.order - b.order))
 
-const timeIndex = (book: Book) => {
-  let index = indexCache.get(book)
-  if (!index) {
-    index = new Map(timeline(book).map((t, i) => [t.id, i]))
-    indexCache.set(book, index)
-  }
-  return index
-}
+const timeIndex = cached((book) => new Map(timeline(book).map((t, i) => [t.id, i])))
 
 /** Erster und letzter Index (in `timeline`), die eine Zeitangabe einschließt */
 export function bounds(book: Book, timing: Timing): [number, number] {
@@ -208,9 +208,17 @@ export function factTiming(book: Book, fact: Fact): Timing {
 /** Die zum Index i gültige Phase */
 export const phaseAt = <T extends { timing: Timing }>(book: Book, phases: T[], i: number) => phases.find((p) => covers(book, p.timing, i))
 
+const factsCache = cached(() => new Map<number, Fact[]>())
+
 /** Alle Fakten, die zum Zeitpunkt mit Index i gelten */
 export function factsAt(book: Book, i: number): Fact[] {
-  return book.facts.filter((f) => (f.kind === 'relation' ? !!phaseAt(book, f.phases, i) : covers(book, factTiming(book, f), i)))
+  const cache = factsCache(book)
+  let facts = cache.get(i)
+  if (!facts) {
+    facts = book.facts.filter((f) => (f.kind === 'relation' ? !!phaseAt(book, f.phases, i) : covers(book, factTiming(book, f), i)))
+    cache.set(i, facts)
+  }
+  return facts
 }
 
 /** IDs aller Elemente, die ein Fakt verbindet */
@@ -229,29 +237,36 @@ export function involvedIds(fact: Fact): string[] {
   }
 }
 
-/** Element mit seiner Art und Anzeigenamen, gesucht über die ID */
-export function findElement(book: Book, id: string): { kind: ElementKind; label: string; element: Named | StoryEvent } | undefined {
+type Found = { kind: ElementKind; label: string; element: Named | StoryEvent }
+
+const elementIndex = cached((book) => {
+  const index = new Map<string, Found>()
   const lists: [ElementKind, Named[]][] = [
     ['person', book.persons],
     ['group', book.groups],
     ['place', book.places],
   ]
-  for (const [kind, list] of lists) {
-    const element = list.find((e) => e.id === id)
-    if (element) return { kind, label: element.name, element }
-  }
-  const event = book.events.find((e) => e.id === id)
-  if (event) return { kind: 'event', label: event.title, element: event }
+  for (const [kind, list] of lists) list.forEach((element) => index.set(element.id, { kind, label: element.name, element }))
+  book.events.forEach((event) => index.set(event.id, { kind: 'event', label: event.title, element: event }))
+  return index
+})
+
+/** Element mit seiner Art und Anzeigenamen, gesucht über die ID */
+export const findElement = (book: Book, id: string): Found | undefined => elementIndex(book).get(id)
+
+const findPlace = (book: Book, id: string) => {
+  const found = findElement(book, id)
+  return found?.kind === 'place' ? (found.element as Place) : undefined
 }
 
 /** Ort selbst und alle Elternorte zum Index i, innen nach außen */
 export function placeChain(book: Book, placeId: string, i: number): Place[] {
   const chain: Place[] = []
-  let place = book.places.find((p) => p.id === placeId)
+  let place = findPlace(book, placeId)
   while (place && !chain.includes(place)) {
     chain.push(place)
     const parent = phaseAt(book, place.phases, i)?.parent
-    place = parent ? book.places.find((p) => p.id === parent) : undefined
+    place = parent ? findPlace(book, parent) : undefined
   }
   return chain
 }

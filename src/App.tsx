@@ -1,18 +1,42 @@
 import { useMemo, useState } from 'react'
-import { ActionIcon, Anchor, Button, Group, Kbd, Paper, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Anchor, Button, Group, Kbd, Paper, Popover, SegmentedControl, Slider, Stack, Text, Title } from '@mantine/core'
 import { useHotkeys } from '@mantine/hooks'
 import { spotlight } from '@mantine/spotlight'
-import { useActiveBook, type ActiveBook } from './github/active'
-import { focusSet, timeline, type Selection, type View } from './model'
+import { hints, type Hint } from './checks'
+import { addFirstTimePoint, useActiveBook, type ActiveBook } from './github/active'
+import { findElement, focusSet, timeline, type Selection, type View } from './model'
 import { computeLayout } from './scene/layout'
 import { Scene } from './scene/Scene'
+import { ErrorPage, ErrorView } from './ui/ErrorView'
 import { FocusPanel } from './ui/FocusPanel'
 import { Search } from './ui/Search'
 
 /** Hauptansicht: lädt das aktive Buch und zeigt es */
 function App() {
   const active = useActiveBook()
-  return active ? <BookView active={active} /> : null
+  if (!active) return null
+  if (active instanceof Error) return <ErrorPage error={active} />
+  return active.book.timePoints.length ? <BookView active={active} /> : <EmptyBook active={active} />
+}
+
+/** Ohne Zeitpunkt gibt es keine Ebene, also nichts anzuzeigen */
+function EmptyBook({ active }: { active: ActiveBook }) {
+  const { repo, errors } = active
+  return (
+    <ErrorView
+      title="Dieses Buch hat noch keine Zeitpunkte"
+      message={
+        <>
+          Ohne Zeitpunkt lässt sich nichts anzeigen. Lege einen ersten Zeitpunkt „Anfang“ an und committe ihn danach auf der GitHub-Seite.
+          {errors.length > 0 && ` Außerdem sind ${errors.length} Dateien fehlerhaft, darunter vielleicht Zeitpunkte.`}
+        </>
+      }
+      fixes={[
+        ...(repo ? [{ label: 'Ersten Zeitpunkt anlegen', run: () => addFirstTimePoint(repo).then(() => location.reload()) }] : []),
+        { label: 'Zur GitHub-Seite', href: 'github.html' },
+      ]}
+    />
+  )
 }
 
 /** 3D-Szene mit Werkzeugleiste, Zeitregler, Fokus-Panel und Suche */
@@ -25,9 +49,10 @@ function BookView({ active }: { active: ActiveBook }) {
   const points = useMemo(() => timeline(book), [book])
   const layout = useMemo(() => computeLayout(book, points.length), [book, points])
   const focus = useMemo(() => focusSet(book, selection), [book, selection])
+  const notes = useMemo(() => hints(book), [book])
 
   const last = points.length - 1
-  const point = points[current]
+  const point = points[current] ?? points[0]!
 
   useHotkeys([
     ['1', () => setView('raum')],
@@ -53,10 +78,18 @@ function BookView({ active }: { active: ActiveBook }) {
               </Anchor>
             </Group>
             {active.errors.length > 0 && (
-              <Anchor href="github.html" size="xs" c="red">
+              <Anchor href="github.html" size="xs" c="red" display="block">
                 {active.errors.length} Dateien fehlerhaft
               </Anchor>
             )}
+            <HintList
+              hints={notes}
+              onOpen={(hint) => {
+                const kind = findElement(book, hint.ids[0]!)?.kind
+                if (kind) setSelection({ kind, id: hint.ids[0]! })
+                setCurrent(hint.at)
+              }}
+            />
           </div>
           <SegmentedControl
             value={view}
@@ -87,7 +120,7 @@ function BookView({ active }: { active: ActiveBook }) {
         </Stack>
       </Paper>
 
-      {selection && <FocusPanel book={book} imageUrl={active.imageUrl} points={points} current={current} selection={selection} onSelect={setSelection} onJump={setCurrent} />}
+      {selection && <FocusPanel book={book} hints={notes} imageUrl={active.imageUrl} points={points} current={current} selection={selection} onSelect={setSelection} onJump={setCurrent} />}
 
       <Paper className="overlay timebar" p="md" radius="md" withBorder shadow="lg">
         <Text size="sm" fw={600}>
@@ -109,7 +142,7 @@ function BookView({ active }: { active: ActiveBook }) {
             step={1}
             value={current}
             onChange={setCurrent}
-            label={(i) => points[i].name}
+            label={(i) => points[i]?.name}
             marks={points.map((_, i) => ({ value: i, label: i + 1 }))}
           />
           <ActionIcon variant="default" onClick={() => setCurrent(current + 1)} disabled={current === last} aria-label="Nächster Zeitpunkt">
@@ -120,6 +153,28 @@ function BookView({ active }: { active: ActiveBook }) {
 
       <Search book={book} points={points} onSelect={setSelection} onJump={setCurrent} />
     </div>
+  )
+}
+
+function HintList({ hints, onOpen }: { hints: Hint[]; onOpen: (hint: Hint) => void }) {
+  if (!hints.length) return null
+  return (
+    <Popover width={360} position="bottom-start" shadow="lg">
+      <Popover.Target>
+        <Anchor component="button" type="button" size="xs" c="yellow">
+          {hints.length} Hinweise
+        </Anchor>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Stack gap={6} mah={320} style={{ overflowY: 'auto' }}>
+          {hints.map((hint, i) => (
+            <Anchor key={i} component="button" type="button" size="sm" ta="left" c="dimmed" onClick={() => onOpen(hint)}>
+              {hint.at + 1}. {hint.text}
+            </Anchor>
+          ))}
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   )
 }
 

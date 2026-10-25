@@ -53,14 +53,14 @@ export function computeLayout(book: Book, count: number): Layout {
       person.id,
       slices.map((i) => {
         const at = (id: string) => places.get(id)?.[i]
-        const stay = facts[i].find((f) => f.kind === 'stay' && f.person === person.id)
+        const stay = facts[i]?.find((f) => f.kind === 'stay' && f.person === person.id)
         if (stay?.kind === 'stay') {
           const center = at(stay.place)
           const ring = ringRadius(book.places.find((p) => p.id === stay.place)!)
           const r = Math.min(PERSON_RADIUS, ring * 0.6)
           return center ? [center[0] + Math.cos(angle) * r, center[1] + Math.sin(angle) * r] : null
         }
-        const journey = facts[i].find((f) => f.kind === 'journey' && f.person === person.id)
+        const journey = facts[i]?.find((f) => f.kind === 'journey' && f.person === person.id)
         if (journey?.kind !== 'journey') return null
         const [a, b] = [at(journey.origin), at(journey.destination)]
         return a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null

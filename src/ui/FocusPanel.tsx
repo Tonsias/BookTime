@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Anchor, Badge, Box, CloseButton, Group, Image, Paper, ScrollArea, Stack, Text, Timeline, Title } from '@mantine/core'
+import type { Hint } from '../checks'
 import {
   bounds,
   elementColor,
@@ -23,6 +24,7 @@ import {
 
 interface FocusPanelProps {
   book: Book
+  hints: Hint[]
   imageUrl: (file: string) => Promise<string | undefined>
   points: TimePoint[]
   current: number
@@ -69,6 +71,7 @@ export function FocusPanel(props: FocusPanelProps) {
           </div>
           <BookImage file={image?.file} alt={found.label} imageUrl={props.imageUrl} />
           {found.kind === 'event' ? <EventDetails {...props} event={found.element as StoryEvent} /> : <ElementDetails {...props} kind={found.kind} />}
+          <HintSection {...props} />
           {found.element.note && (
             <Section title="Notiz">
               <Markdown>{found.element.note}</Markdown>
@@ -77,6 +80,25 @@ export function FocusPanel(props: FocusPanelProps) {
         </Stack>
       </ScrollArea.Autosize>
     </Paper>
+  )
+}
+
+function HintSection({ hints, selection, onJump }: FocusPanelProps) {
+  const own = hints.filter((h) => h.ids.includes(selection.id))
+  if (!own.length) return null
+  return (
+    <Section title="Hinweise">
+      <Stack gap={4}>
+        {own.map((hint, i) => (
+          <Text key={i} size="sm" c="yellow">
+            <Anchor component="button" type="button" size="sm" fw={600} onClick={() => onJump(hint.at)}>
+              {hint.at + 1}
+            </Anchor>{' '}
+            {hint.text}
+          </Text>
+        ))}
+      </Stack>
+    </Section>
   )
 }
 
@@ -110,7 +132,7 @@ function ElementDetails(props: FocusPanelProps & { kind: ElementKind }) {
 
   return (
     <>
-      <Section title={`Stand: ${current + 1}. ${points[current].name}`}>
+      <Section title={`Stand: ${current + 1}. ${points[current]?.name ?? ''}`}>
         {now.length ? (
           <Stack gap={6}>
             {now.map((fact) => (

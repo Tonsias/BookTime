@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Book } from '../model'
-import { filesToBook, type LoadError } from '../storage/format'
+import { filesToBook, firstTimePoint, type LoadError } from '../storage/format'
 import { sampleFiles, sampleImages } from '../storage/sample'
 import { GitHub } from './api'
 import { activeRepo, copies, imageCache, token } from './store'
@@ -18,7 +18,7 @@ const TYPES: Record<string, string> = { svg: 'image/svg+xml', png: 'image/png', 
 // GitHub liefert Dateien ohne Typ, ohne ihn lädt der Browser z. B. kein SVG als Bild
 const imageType = (file: string) => TYPES[file.split('.').pop()!.toLowerCase()] ?? ''
 
-const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles), repo: null, imageUrl: async (file) => sampleImages[file] })
+const sample = (): ActiveBook => ({ ...filesToBook(sampleFiles, Object.keys(sampleImages)), repo: null, imageUrl: async (file) => sampleImages[file] })
 
 async function loadActive(): Promise<ActiveBook> {
   const repo = activeRepo.get()
@@ -37,7 +37,7 @@ async function loadActive(): Promise<ActiveBook> {
     return blob && URL.createObjectURL(new Blob([blob], { type: imageType(file) }))
   }
   return {
-    ...filesToBook(copy.files),
+    ...filesToBook(copy.files, Object.keys(copy.images)),
     repo,
     imageUrl: (file) => {
       if (!urls.has(file)) urls.set(file, imageUrl(file).catch(() => undefined))
@@ -46,13 +46,19 @@ async function loadActive(): Promise<ActiveBook> {
   }
 }
 
-/** Lädt das aktive Buch aus der Arbeitskopie, sonst das Beispielbuch */
+/** Lädt das aktive Buch aus der Arbeitskopie, sonst das Beispielbuch; liefert beim Scheitern den Fehler */
 export function useActiveBook() {
-  const [active, setActive] = useState<ActiveBook>()
+  const [active, setActive] = useState<ActiveBook | Error>()
   useEffect(() => {
-    loadActive()
-      .catch((error: Error) => ({ ...sample(), errors: [{ path: activeRepo.get() ?? '', reason: error.message }] }))
-      .then(setActive)
+    loadActive().then(setActive, setActive)
   }, [])
   return active
+}
+
+/** Legt in der Arbeitskopie des aktiven Repos einen ersten Zeitpunkt an */
+export async function addFirstTimePoint(repo: string) {
+  const copy = await copies.get(repo)
+  if (!copy) return
+  const [path, content] = firstTimePoint(copy.files)
+  await copies.put({ ...copy, files: { ...copy.files, [path]: content } })
 }

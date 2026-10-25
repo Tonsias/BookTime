@@ -1,4 +1,4 @@
-import { FORMAT, type BookFiles } from '../storage/format'
+import { FORMAT, firstTimePoint, type BookFiles } from '../storage/format'
 import { GitHub } from './api'
 import { copies, type WorkingCopy } from './store'
 
@@ -42,7 +42,9 @@ export async function load(token: string, repo: string): Promise<WorkingCopy> {
   if (!main) {
     const title = repo.split('/')[1]
     await gh.createFirstFile('booktime.json', JSON.stringify({ format: FORMAT, title }, null, 2) + '\n', 'BookTime einrichten')
-    main = (await gh.branchSha(info.default_branch))!
+    const [path, content] = firstTimePoint({})
+    main = await gh.commit((await gh.branchSha(info.default_branch))!, 'Ersten Zeitpunkt anlegen', { [path]: { content } })
+    await gh.setBranch(info.default_branch, main, 'update')
   }
   let head = await gh.branchSha(branch)
   if (!head) {
@@ -80,7 +82,7 @@ export async function load(token: string, repo: string): Promise<WorkingCopy> {
 /** Fasst die offenen Änderungen zu einem lokalen Commit zusammen */
 export async function commitLocal(copy: WorkingCopy, message: string) {
   const before = committed(copy)
-  const changes = Object.fromEntries(diff(before, copy.files).map(([path, kind]) => [path, kind === 'gelöscht' ? null : copy.files[path]]))
+  const changes = Object.fromEntries(diff(before, copy.files).map(([path, kind]) => [path, kind === 'gelöscht' ? null : (copy.files[path] ?? null)]))
   const next = { ...copy, commits: [...copy.commits, { message, changes }] }
   await copies.put(next)
   return next

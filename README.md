@@ -42,11 +42,12 @@ Stack: React, Vite, TypeScript, [Mantine](https://mantine.dev), [React Three Fib
 npm install
 npm run dev      # Dev-Server
 npm run build    # Typecheck + Produktions-Build nach dist/
-npm run check    # Lint, Dead Code, Duplikate, Doku, Beispielbuch – muss vor jedem Push fehlerfrei laufen
+npm test         # Tests (Vitest)
+npm run check    # Lint, Typen, Tests, Dead Code, Duplikate, Doku, Beispielbuch – muss vor jedem Push fehlerfrei laufen
 ```
 
 Bekannte, bewusst akzeptierte Konsolenmeldung: `THREE.Clock: This module has been deprecated` kommt aus
 `@react-three/fiber` und verschwindet, sobald fiber auf `THREE.Timer` umstellt.
 
-Deployment auf GitHub Pages läuft automatisch per GitHub Actions bei jedem Push auf `main`, die
-Qualitäts-Checks laufen zusätzlich bei Pull Requests.
+Die Qualitäts-Checks laufen per GitHub Actions bei jedem Push auf `main` und bei Pull Requests. Erst wenn
+sie auf `main` grün sind, wird auf GitHub Pages deployt.

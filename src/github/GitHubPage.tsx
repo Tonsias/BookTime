@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Anchor, Badge, Button, Code, Container, Group, Paper, PasswordInput, Stack, Table, Text, TextInput, Textarea, Title } from '@mantine/core'
-import { filesToBook } from '../storage/format'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Alert, Anchor, Badge, Button, Code, Container, Group, Modal, Paper, PasswordInput, Stack, Table, Text, TextInput, Textarea, Title } from '@mantine/core'
+import { filesToBook, FormatTooNewError } from '../storage/format'
 import { GitHub } from './api'
 import { activeRepo, books, copies, token, type WorkingCopy } from './store'
 import { commitLocal, committed, diff, load, openPull, push } from './sync'
@@ -19,6 +19,12 @@ export function GitHubPage() {
   const [copy, setCopy] = useState<WorkingCopy>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [guarded, setGuarded] = useState<{ copy: WorkingCopy; then: () => Promise<WorkingCopy | void> }>()
+
+  useEffect(() => {
+    // Browser soll die Arbeitskopien nicht bei Speicherknappheit löschen
+    navigator.storage?.persist?.().catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     if (key) new GitHub(key, '').login().then(setLogin, (e: Error) => setError(`Token ungültig: ${e.message}`))
@@ -39,6 +45,12 @@ export function GitHubPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  /** Führt eine Aktion aus, die die Arbeitskopie ersetzt; mit offenen Änderungen erst nach Rückfrage */
+  const guard = (stored: WorkingCopy | undefined, then: () => Promise<WorkingCopy | void>) => {
+    if (stored && hasPending(stored)) setGuarded({ copy: stored, then })
+    else run(then)
   }
 
   const show = (repo: string | null) => {
@@ -93,16 +105,16 @@ export function GitHubPage() {
                         variant="subtle"
                         color="red"
                         onClick={() =>
-                          run(async () => {
-                            const stored = await copies.get(repo)
-                            if (stored && hasPending(stored) && !confirm(`${repo} hat nicht gepushte Änderungen. Trotzdem entfernen?`)) return
-                            await copies.delete(repo)
-                            const next = list.filter((r) => r !== repo)
-                            books.set(next)
-                            setList(next)
-                            if (active === repo) show(null)
-                            if (selected === repo) setSelected(null)
-                          })
+                          copies.get(repo).then((stored) =>
+                            guard(stored, async () => {
+                              await copies.delete(repo)
+                              const next = list.filter((r) => r !== repo)
+                              books.set(next)
+                              setList(next)
+                              if (active === repo) show(null)
+                              if (selected === repo) setSelected(null)
+                            }),
+                          )
                         }
                       >
                         Entfernen
@@ -131,8 +143,10 @@ export function GitHubPage() {
             shown={active === selected}
             onShow={() => show(selected)}
             run={run}
+            guard={guard}
           />
         )}
+        {guarded && <DiscardDialog copy={guarded.copy} token={key} onClose={() => setGuarded(undefined)} run={run} then={guarded.then} />}
       </Stack>
     </Container>
   )
@@ -197,17 +211,23 @@ interface BookSectionProps {
   shown: boolean
   onShow: () => void
   run: (action: () => Promise<WorkingCopy | void>) => void
+  guard: (copy: WorkingCopy | undefined, then: () => Promise<WorkingCopy | void>) => void
 }
 
-function BookSection({ repo, copy, token: key, busy, shown, onShow, run }: BookSectionProps) {
+function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }: BookSectionProps) {
   const [message, setMessage] = useState('')
-  const reload = () =>
-    run(async () => {
-      if (copy && hasPending(copy) && !confirm('Nicht gepushte Änderungen gehen beim Neuladen verloren. Trotzdem neu laden?')) return
-      return load(key, repo)
-    })
+  const reload = () => guard(copy, () => load(key, repo))
+  const checked = useMemo(() => {
+    if (!copy) return undefined
+    try {
+      return { errors: filesToBook(copy.files, Object.keys(copy.images)).errors, changes: diff(committed(copy), copy.files) }
+    } catch (error) {
+      if (error instanceof FormatTooNewError) return { tooNew: error.message, errors: [], changes: [] }
+      throw error
+    }
+  }, [copy])
 
-  if (!copy)
+  if (!copy || !checked)
     return (
       <Section title={repo}>
         <Button onClick={reload} loading={busy}>
@@ -216,8 +236,8 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run }: BookS
       </Section>
     )
 
-  const { errors } = filesToBook(copy.files)
-  const changes = diff(committed(copy), copy.files)
+  const { errors, changes } = checked
+  const fileUrl = (path: string) => `https://github.com/${repo}/blob/${encodeURIComponent(copy.branch).replaceAll('%2F', '/')}/${path}`
   return (
     <Section title={repo}>
       <Stack gap="md">
@@ -240,11 +260,22 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run }: BookS
           </Button>
         </Group>
 
+        {'tooNew' in checked && (
+          <Alert color="red" title="Buch ist neuer als diese BookTime-Version">
+            <Text size="sm">{checked.tooNew}</Text>
+            <Button mt="sm" size="xs" variant="white" color="red" onClick={() => location.reload()}>
+              Neue Version laden
+            </Button>
+          </Alert>
+        )}
         {errors.length > 0 && (
           <Alert color="red" title={`${errors.length} fehlerhafte Dateien – Commit erst nach dem Beheben möglich`}>
             {errors.map((e) => (
               <Text key={e.path + e.reason} size="sm">
-                <Code>{e.path}</Code> {e.reason}
+                <Code>{e.path}</Code> {e.reason}{' '}
+                <Anchor href={fileUrl(e.path)} target="_blank" size="sm">
+                  Datei auf GitHub öffnen
+                </Anchor>
               </Text>
             ))}
           </Alert>
@@ -260,7 +291,7 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run }: BookS
             </Text>
           ) : (
             changes.map(([path, kind]) => (
-              <Text key={path} size="sm">
+              <Text key={path} size="sm" component="div">
                 <Badge size="xs" variant="light" mr="xs">
                   {kind}
                 </Badge>
@@ -321,6 +352,46 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run }: BookS
         </div>
       </Stack>
     </Section>
+  )
+}
+
+function DiscardDialog(props: {
+  copy: WorkingCopy
+  token: string | null
+  onClose: () => void
+  run: (action: () => Promise<WorkingCopy | void>) => void
+  then: () => Promise<WorkingCopy | void>
+}) {
+  const { copy, token: key, onClose, run, then } = props
+  const open = diff(committed(copy), copy.files).length
+  const act = (action: () => Promise<WorkingCopy | void>) => {
+    onClose()
+    run(action)
+  }
+  return (
+    <Modal opened onClose={onClose} title="Nicht gepushte Änderungen">
+      <Stack gap="md">
+        <Text size="sm">
+          Die Arbeitskopie von {copy.repo} hat {open} offene Änderungen und {copy.commits.length} lokale Commits. Sie gingen verloren.
+        </Text>
+        {open > 0 && (
+          <Text size="sm" c="dimmed">
+            Offene Änderungen bitte zuerst committen, dann lassen sie sich hier pushen.
+          </Text>
+        )}
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>
+            Abbrechen
+          </Button>
+          <Button disabled={!key || open > 0 || !copy.commits.length} onClick={() => act(async () => (await push(key!, copy), then()))}>
+            Erst pushen
+          </Button>
+          <Button color="red" onClick={() => act(then)}>
+            Verwerfen
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   )
 }
 

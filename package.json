@@ -7,12 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
     "preview": "vite preview",
     "check:dead": "knip",
     "check:dup": "jscpd",
     "check:docs": "node scripts/check-docs.mjs --min-exports=100 --max-comments=5",
-    "check": "npm run lint && npm run check:dead && npm run check:dup && npm run check:docs && npm run check:beispiel",
-    "check:beispiel": "node scripts/check-beispiel.mjs"
+    "check": "npm run lint && npm run typecheck && npm test && npm run check:dead && npm run check:dup && npm run check:docs && npm run check:beispiel",
+    "check:beispiel": "vitest run src/storage/beispiel.test.ts"
   },
   "dependencies": {
     "@mantine/core": "^9.7.3",
@@ -34,6 +36,7 @@
     "knip": "^6.41.0",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.5"
   }
 }

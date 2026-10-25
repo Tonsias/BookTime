@@ -81,7 +81,7 @@ export class GitHub {
         method: 'POST',
         body: { query },
       })
-      if (errors?.length) throw new GitHubError(400, errors[0].message)
+      if (errors?.[0]) throw new GitHubError(400, errors[0].message)
       batch.forEach((path, j) => {
         const text = data?.repository[`f${j}`]?.text
         if (text !== undefined) result[path] = text

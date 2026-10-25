@@ -1,3 +1,4 @@
+import { problems } from '../checks'
 import type { Book, Fact } from '../model'
 
 /** Dateiinhalte eines Buchs, Pfad relativ zum Repo-Wurzelordner */
@@ -15,7 +16,7 @@ export const FORMAT = 1
 type RefKind = 'timePoint' | 'person' | 'group' | 'actor' | 'place' | 'event' | 'relationType'
 type Scalar = 'id' | 'string' | 'number' | 'positive' | 'boolean' | 'color' | 'timing' | 'strength' | RefKind
 interface Spec {
-  [key: string]: Scalar | `${Scalar}?` | Spec[] | Spec
+  [key: string]: Scalar | `${Scalar}?` | [Spec] | Spec
 }
 
 const IMAGE: Spec = { id: 'id', file: 'string', order: 'number', timing: 'timing?', note: 'string?' }
@@ -104,9 +105,9 @@ const UMLAUTS: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss'
 const slug = (text: string) =>
   text
     .toLowerCase()
-    .replace(/[äöüß]/g, (c) => UMLAUTS[c])
+    .replace(/[äöüß]/g, (c) => UMLAUTS[c] ?? c)
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{Diacritic}/gu, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
@@ -218,9 +219,34 @@ interface Parsed {
 }
 
 const FILE = /^(.+)\/[a-z0-9-]+-([a-z0-9]{4})\.json$/
+const TEXT = /^(.+\/[a-z0-9-]+-[a-z0-9]{4})\.(\w+)\.md$/
+const IMAGE_FILE = /^images\/[a-z0-9-]+-[a-z0-9]{4}\.\w+$/
+const BOOK_FOLDERS = ['images', 'facts', ...KINDS.map((k) => k.folder.split('/')[0])]
 
-/** Liest ein Buch aus Repo-Dateien; fehlerhafte Dateien werden übersprungen und aufgelistet */
-export function filesToBook(files: BookFiles): { book: Book; errors: LoadError[] } {
+/** Buch hat eine neuere Formatversion, als diese App lesen kann */
+export class FormatTooNewError extends Error {}
+
+const nestedIds = (item: Record<string, unknown>): unknown[] => {
+  const lists = ['phases', 'images'].flatMap((key) => (Array.isArray(item[key]) ? (item[key] as Record<string, unknown>[]) : []))
+  const background = item.background as Record<string, unknown> | undefined
+  return [item.id, ...(background ? [background.id] : []), ...lists.flatMap(nestedIds)]
+}
+
+const ACCEPTS: Record<RefKind, Kind['key'][]> = {
+  timePoint: ['timePoints'],
+  person: ['persons'],
+  group: ['groups'],
+  actor: ['persons', 'groups'],
+  place: ['places'],
+  event: ['events'],
+  relationType: ['relationTypes'],
+}
+
+/**
+ * Liest ein Buch aus Repo-Dateien; fehlerhafte Dateien werden übersprungen und aufgelistet.
+ * `others` sind die übrigen Pfade im Repo (z. B. Bilder), die nur auf ihren Namen geprüft werden.
+ */
+export function filesToBook(files: BookFiles, others: string[] = []): { book: Book; errors: LoadError[] } {
   const errors: LoadError[] = []
   let meta: Record<string, unknown> = {}
   try {
@@ -228,17 +254,21 @@ export function filesToBook(files: BookFiles): { book: Book; errors: LoadError[]
   } catch {
     errors.push({ path: 'booktime.json', reason: 'kein gültiges JSON' })
   }
-  if (typeof meta.format === 'number' && meta.format > FORMAT) throw new Error(`Format ${meta.format} ist neuer als diese BookTime-Version`)
+  if (typeof meta.format === 'number' && meta.format > FORMAT) throw new FormatTooNewError(`Das Buch hat Format ${meta.format}, diese BookTime-Version kennt nur bis ${FORMAT}.`)
 
   const parsed: Parsed[] = []
-  for (const path of Object.keys(files).sort()) {
+  for (const path of [...Object.keys(files), ...others].sort()) {
+    const fail = (reason: string) => errors.push({ path, reason })
+    const text = files[path]
     const match = FILE.exec(path)
     const kind = match && KINDS.find((k) => k.folder === match[1])
-    if (!kind) continue
-    const fail = (reason: string) => errors.push({ path, reason })
+    if (!kind || !match || text === undefined) {
+      unknownFile(path, files, fail)
+      continue
+    }
     let item: Record<string, unknown>
     try {
-      item = JSON.parse(files[path])
+      item = JSON.parse(text)
     } catch {
       fail('kein gültiges JSON')
       continue
@@ -251,44 +281,76 @@ export function filesToBook(files: BookFiles): { book: Book; errors: LoadError[]
   }
 
   const count = new Map<unknown, number>()
-  parsed.forEach((p) => count.set(p.item.id, (count.get(p.item.id) ?? 0) + 1))
+  parsed.flatMap((p) => nestedIds(p.item)).forEach((id) => count.set(id, (count.get(id) ?? 0) + 1))
   let valid = parsed.filter((p) => {
-    if (count.get(p.item.id) === 1) return true
-    errors.push({ path: p.path, reason: `ID „${p.item.id}“ kommt mehrfach vor` })
-    return false
+    const twice = nestedIds(p.item).find((id) => count.get(id) !== 1)
+    if (twice !== undefined) errors.push({ path: p.path, reason: `ID „${twice}“ kommt mehrfach vor` })
+    return twice === undefined
   })
-  // Fällt eine Datei weg, können weitere Verweise ins Leere zeigen
+  // Fällt eine Datei weg, können weitere Verweise ins Leere zeigen oder Prüfungen anders ausgehen
   for (let changed = true; changed; ) {
     const kinds = new Map(valid.map((p) => [p.item.id as string, p.kind.key]))
-    const accepts: Record<RefKind, Kind['key'][]> = {
-      timePoint: ['timePoints'],
-      person: ['persons'],
-      group: ['groups'],
-      actor: ['persons', 'groups'],
-      place: ['places'],
-      event: ['events'],
-      relationType: ['relationTypes'],
-    }
-    const next = valid.filter((p) => {
-      const missing = p.refs.find((r) => !accepts[r.kind].includes(kinds.get(r.id)!))
+    let next = valid.filter((p) => {
+      const missing = p.refs.find((r) => !ACCEPTS[r.kind].includes(kinds.get(r.id)!))
       if (missing) errors.push({ path: p.path, reason: `Verweis auf unbekannte ID „${missing.id}“` })
       return !missing
     })
+    if (next.length === valid.length) {
+      const failed = new Map(problems(assemble(meta, files, next)).map((p) => [p.id, p.reason]))
+      next = next.filter((p) => {
+        const reason = failed.get(p.item.id as string)
+        if (reason) errors.push({ path: p.path, reason })
+        return !reason
+      })
+    }
     changed = next.length !== valid.length
     valid = next
   }
+  return { book: assemble(meta, files, valid), errors }
+}
 
+function unknownFile(path: string, files: BookFiles, fail: (reason: string) => void) {
+  const folder = path.split('/')[0]!
+  if (!path.includes('/') || !BOOK_FOLDERS.includes(folder)) return
+  if (folder === 'images') {
+    if (!IMAGE_FILE.test(path)) fail('Bildname passt nicht zum Schema <name>-<id>.<endung>')
+    return
+  }
+  const text = TEXT.exec(path)
+  const kind = text && KINDS.find((k) => path.startsWith(k.folder + '/') && k.folder === text[1]!.slice(0, text[1]!.lastIndexOf('/')))
+  if (!text || !kind) fail('Datei passt zu keinem Element (Ordner oder Name unbekannt)')
+  else if (!kind.texts.includes(text[2]!)) fail(`Textfeld „${text[2]}“ gibt es bei ${kind.folder} nicht`)
+  else if (files[`${text[1]}.json`] === undefined) fail('Text ohne zugehörige JSON-Datei')
+}
+
+function assemble(meta: Record<string, unknown>, files: BookFiles, valid: Parsed[]): Book {
   const book: Book = { title: typeof meta.title === 'string' ? meta.title : 'Ohne Titel', timePoints: [], persons: [], groups: [], places: [], events: [], relationTypes: [], facts: [] }
   const markdown = (path: string) => files[path]?.replace(/\n$/, '')
   if (files['booktime.note.md']) book.note = markdown('booktime.note.md')
-  for (const { kind, path, item } of valid) {
+  for (const { kind, path, item: parsed } of valid) {
+    const item = { ...parsed }
     for (const text of kind.texts) {
       const content = markdown(path.replace(/\.json$/, `.${text}.md`))
       if (content !== undefined) item[text] = content
       else if (text !== 'note') item[text] = ''
     }
-    if (isFactKind(kind.key)) book.facts.push({ kind: kind.key, ...item } as Fact)
+    if (isFactKind(kind.key)) book.facts.push({ kind: kind.key, ...item } as unknown as Fact)
     else (book[kind.key] as unknown[]).push(item)
   }
-  return { book, errors }
+  return book
+}
+
+/** Zufällige ID aus 4 Zeichen, die in `taken` noch nicht vorkommt */
+function newId(taken: Set<string>) {
+  for (;;) {
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => (b % 36).toString(36)).join('')
+    if (!taken.has(id)) return id
+  }
+}
+
+/** Datei für einen ersten Zeitpunkt „Anfang“, mit dem ein Buch auswertbar wird */
+export function firstTimePoint(files: BookFiles): [string, string] {
+  const taken = new Set(Object.keys(files).flatMap((path) => /-([a-z0-9]{4})\./.exec(path)?.slice(1) ?? []))
+  const id = newId(taken)
+  return [`time-points/anfang-${id}.json`, json({ id, name: 'Anfang', order: 1 })]
 }

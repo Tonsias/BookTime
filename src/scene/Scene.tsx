@@ -64,7 +64,7 @@ export function Scene(props: SceneProps) {
       <TimeClip enabled={view === 'netz'} x={current * SLICE_SPACING} />
 
       {visible.map((i) => (
-        <Layer key={points[i].id} index={i} title={points[i].name} active={i === current} opacity={sliceOpacity(i)} onJump={onJump} />
+        <Layer key={i} index={i} title={points[i]?.name ?? ''} active={i === current} opacity={sliceOpacity(i)} onJump={onJump} />
       ))}
       {visible.map((i) => {
         const background = backgroundAt(book, i)
