@@ -11,8 +11,14 @@ Visuelle Buchplanung: Personen, Gruppen, Orte, Beziehungen und Events als Netz, 
 - **Netz** – Blick entlang der Zeitachse auf den aktuellen Zeitpunkt
 - **Zeit** – Seitenansicht, jede Figur als Spur
 - Zeitregler unten wechselt zwischen den Zeitpunkten der Geschichte
-- Klick auf Person, Ort oder Event-Marker öffnet das Fokus-Panel mit Stand, Verlauf und Querverweisen
-- `Strg+K` sucht nach Personen, Gruppen, Orten, Events und Zeitpunkten
+- Klick auf Person, Ort oder Event-Marker öffnet das Panel; dort ist alles direkt bearbeitbar (Klick ins Feld,
+  Enter übernimmt, Esc verwirft) und wird automatisch im Browser gespeichert
+- In Raum und Netz: Person auf Ort ziehen = Aufenthalt, auf Person = Beziehung (gerichtet vom Gezogenen zum
+  Ziel), auf Event = Teilnahme; Ort am Ring ziehen = neue Lage; Doppelklick ins Leere = neuer Ort
+- „Ab hier / Ganze Phase“ in der Zeitleiste legt fest, ob zeitliche Werte ab dem aktuellen Zeitpunkt gelten
+- `N` legt Neues an, `Strg+K` sucht und legt Unbekanntes an, `Strg+Z` / `Strg+Y` nimmt zurück, `Entf` löscht
+- „Hinweise auflösen“ zeigt Widersprüche mit Lösungen, auch zum Markieren als gewollt
+- Das Beispielbuch lässt sich ohne GitHub bearbeiten; im Buch-Panel setzt „Zurücksetzen“ es zurück
 
 In der Szene sind Orte Ringe an ihrer Position in der Welt, Personen Stränge durch die Zeit, Events
 Marker am Ort und Beziehungen Linien in der Farbe ihrer Art. Die Dicke einer Linie zeigt die Stärke, ein
@@ -43,7 +49,8 @@ npm install
 npm run dev      # Dev-Server
 npm run build    # Typecheck + Produktions-Build nach dist/
 npm test         # Tests (Vitest)
-npm run check    # Lint, Typen, Tests, Dead Code, Duplikate, Doku, Beispielbuch – muss vor jedem Push fehlerfrei laufen
+npm run check:e2e  # Ende-zu-Ende-Tests (Playwright); einmalig: npx playwright install chromium
+npm run check    # Lint, Typen, Tests, Dead Code, Duplikate, Doku, Beispielbuch, Ende zu Ende – vor jedem Push
 ```
 
 Bekannte, bewusst akzeptierte Konsolenmeldung: `THREE.Clock: This module has been deprecated` kommt aus

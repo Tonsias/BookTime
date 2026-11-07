@@ -39,6 +39,7 @@ manuell).
 | Duplikate | `npm run check:dup` (jscpd, `.jscpd.json`) | höchstens 3 % duplizierter Code in `src/` |
 | Doku | `npm run check:docs` (`scripts/check-docs.mjs`) | jeder Export hat JSDoc (100 %); alle Kommentare inkl. JSDoc höchstens 5 % der Zeilen |
 | Beispielbuch | `npm run check:beispiel` (`src/storage/beispiel.test.ts`) | `beispiel/` lädt ohne Fehler und Hinweise, wird unverändert zurückgeschrieben, nutzt genau die vorhandenen Bilder |
+| Ende zu Ende | `npm run check:e2e` (Playwright, `e2e/*.e2e.ts`, Build im Modus `e2e`) | alle grün in echtem Chromium mit WebGL, keine Konsolenfehler oder -warnungen |
 
 Dokumentation bewusst minimal halten: JSDoc möglichst einzeilig und nur das Warum/Was, das der Name
 nicht schon sagt; Inline-Kommentare nur, wo der Code allein nicht verständlich ist.
@@ -50,13 +51,16 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 
 - `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
   Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`, `backgroundAt`)
-- `src/checks.ts` – Prüfungen nach Festlegung 14 des Datenmodells: Verbote (`problems`, beim Laden) und Hinweise (`hints`)
+- `src/checks.ts` – Prüfungen nach Festlegung 14 des Datenmodells: Verbote (`problems`, beim Laden und Bearbeiten) und Hinweise (`hints`)
+- `src/edit/` – Editor nach `docs/2026-11-editor.md`: reine Änderungen `Book → Book` (`ops`), Lösungen zu Hinweisen
+  (`fixes`), Speichern als Dateiunterschied (`save`), Stand und Verlauf (`useEditor`)
 - `src/storage/` – Dateiformat eines Buchs (`bookToFiles`, `filesToBook` mit Prüfung) nach
   `docs/2026-10-speicherung-github.md`, Beispielbuch aus `beispiel/`
 - `src/github/` – eigene Seite `github.html`: Token, Bücher, Arbeitskopie (IndexedDB), Commit, Push, Pull Request
 - `beispiel/` – Beispielbuch im Repo-Format, wird von `npm run check` geprüft
-- `src/scene/` – 3D-Szene und Layout (Zeit = x-Achse, Netz = y/z-Ebene)
-- `src/ui/` – Mantine-Oberfläche (Fokus-Panel, Suche)
+- `src/scene/` – 3D-Szene und Layout (Zeit = x-Achse, Netz = y/z-Ebene), Ziehen auf der aktuellen Ebene (`Gestures`, `hits`)
+- `src/ui/` – Mantine-Oberfläche: Leisten, Felder, Dialoge, Suche, Editor-Panels (`panel/`)
+- `e2e/` – Playwright-Tests; `window.__booktime` gibt es nur im Build-Modus `e2e`
 - `docs/` – akzeptierte Vorschläge
 
 ## Entscheidungen: immer nachfragen

@@ -3,7 +3,7 @@ import { Alert, Anchor, Badge, Button, Code, Container, Group, Modal, Paper, Pas
 import { filesToBook, FormatTooNewError } from '../storage/format'
 import { GitHub } from './api'
 import { activeRepo, books, copies, token, type WorkingCopy } from './store'
-import { commitLocal, committed, diff, load, openPull, push } from './sync'
+import { changes as pending, commitLocal, currentImages, load, openPull, push, unpushedImageSize } from './sync'
 
 const REPO = /^[\w.-]+\/[\w.-]+$/
 
@@ -152,7 +152,7 @@ export function GitHubPage() {
   )
 }
 
-const hasPending = (copy: WorkingCopy) => copy.commits.length > 0 || diff(committed(copy), copy.files).length > 0
+const hasPending = (copy: WorkingCopy) => copy.commits.length > 0 || pending(copy).length > 0
 
 function TokenSection({ token: value, login, onChange }: { token: string | null; login?: string; onChange: (token: string | null) => void }) {
   const [input, setInput] = useState('')
@@ -220,7 +220,7 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }
   const checked = useMemo(() => {
     if (!copy) return undefined
     try {
-      return { errors: filesToBook(copy.files, Object.keys(copy.images)).errors, changes: diff(committed(copy), copy.files) }
+      return { errors: filesToBook(copy.files, Object.keys(currentImages(copy))).errors, changes: pending(copy) }
     } catch (error) {
       if (error instanceof FormatTooNewError) return { tooNew: error.message, errors: [], changes: [] }
       throw error
@@ -247,8 +247,9 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }
             <Code>{copy.head.slice(0, 7)}</Code>
           </Info>
           <Info label="Repo-Größe">{size(copy.repoSize)}</Info>
+          {unpushedImageSize(copy) > 0 && <Info label="Neue Bilder, nicht gepusht">{size(Math.ceil(unpushedImageSize(copy) / 1024))}</Info>}
           <Info label="Dateien">
-            {Object.keys(copy.files).length} Text, {Object.keys(copy.images).length} Bilder
+            {Object.keys(copy.files).length} Text, {Object.keys(currentImages(copy)).length} Bilder
           </Info>
         </Group>
         <Group>
@@ -327,7 +328,7 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }
           ) : (
             copy.commits.map((c, i) => (
               <Text key={i} size="sm">
-                {c.message} <Text span c="dimmed">({Object.keys(c.changes).length} Dateien)</Text>
+                {c.message} <Text span c="dimmed">({Object.keys(c.changes).length + Object.keys(c.images ?? {}).length} Dateien)</Text>
               </Text>
             ))
           )}
@@ -363,7 +364,7 @@ function DiscardDialog(props: {
   then: () => Promise<WorkingCopy | void>
 }) {
   const { copy, token: key, onClose, run, then } = props
-  const open = diff(committed(copy), copy.files).length
+  const open = pending(copy).length
   const act = (action: () => Promise<WorkingCopy | void>) => {
     onClose()
     run(action)

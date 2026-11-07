@@ -13,8 +13,10 @@
     "check:dead": "knip",
     "check:dup": "jscpd",
     "check:docs": "node scripts/check-docs.mjs --min-exports=100 --max-comments=5",
-    "check": "npm run lint && npm run typecheck && npm test && npm run check:dead && npm run check:dup && npm run check:docs && npm run check:beispiel",
-    "check:beispiel": "vitest run src/storage/beispiel.test.ts"
+    "check": "npm run lint && npm run typecheck && npm test && npm run check:dead && npm run check:dup && npm run check:docs && npm run check:beispiel && npm run check:e2e",
+    "check:beispiel": "vitest run src/storage/beispiel.test.ts",
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
+    "check:e2e": "playwright test"
   },
   "dependencies": {
     "@mantine/core": "^9.7.3",
@@ -28,6 +30,9 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
@@ -35,6 +40,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "fake-indexeddb": "^6.2.6",
     "jscpd": "^5.4.1",
+    "jsdom": "^29.1.1",
     "knip": "^6.41.0",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",

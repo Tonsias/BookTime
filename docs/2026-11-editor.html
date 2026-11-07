@@ -1,0 +1,1456 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookTime Editor – Prototyp</title>
+<style>
+  :root {
+    --bg: #0b0d12; --ov: rgba(20, 22, 30, 0.9); --bd: #2f3444; --bd2: #3a4152; --tx: #d5d9e3; --dim: #8b93a7;
+    --pri: #6b8cff; --pri-bg: rgba(107, 140, 255, 0.18); --red: #f87171; --yel: #facc15; --ok: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--tx); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button { font: inherit; color: inherit; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; }
+  .overlay { position: absolute; z-index: 20; background: var(--ov); backdrop-filter: blur(8px); border: 1px solid var(--bd); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+
+  /* Werkzeugleiste */
+  .toolbar { top: 16px; left: 16px; width: 290px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .book-title { font-size: 17px; font-weight: 700; text-align: left; background: none; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; margin: -2px -6px; cursor: pointer; }
+  .book-title:hover { border-color: var(--bd2); }
+  .meta { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--dim); flex-wrap: wrap; }
+  .save { display: inline-flex; gap: 5px; align-items: center; }
+  .save i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  .save.busy i { background: var(--yel); animation: pulse .7s infinite alternate; }
+  @keyframes pulse { to { opacity: .3; } }
+  .link { background: none; border: 0; padding: 0; color: var(--pri); cursor: pointer; font-size: 12px; }
+  .link.warn { color: var(--yel); }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .btn { background: #1d212c; border: 1px solid var(--bd2); border-radius: 7px; padding: 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover:not(:disabled) { background: #262b38; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn.primary { background: var(--pri); border-color: var(--pri); color: #fff; }
+  .btn.primary:hover { background: #5a7cf0; }
+  .btn.danger { color: var(--red); }
+  .btn.icon { padding: 6px 9px; }
+  .grow { flex: 1; }
+  kbd { font: 11px ui-monospace, monospace; background: #2a2f3c; border: 1px solid #444b5c; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--dim); }
+  .seg { display: flex; background: #151820; border: 1px solid var(--bd2); border-radius: 8px; padding: 2px; }
+  .seg button { flex: 1; background: none; border: 0; border-radius: 6px; padding: 4px 8px; cursor: pointer; color: var(--dim); font-size: 13px; }
+  .seg button.on { background: #2a3040; color: #fff; }
+  .seg button:disabled { cursor: not-allowed; opacity: .4; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .legend button { background: none; border: 1px solid transparent; border-radius: 5px; padding: 1px 4px; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--dim); }
+  .legend button:hover { border-color: var(--bd2); color: var(--tx); }
+  .legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+  /* Panel */
+  .panel { top: 16px; right: 16px; width: min(380px, calc(100% - 32px)); max-height: calc(100vh - 200px); overflow-y: auto; padding: 16px; }
+  .panel-head { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .panel-head .name { font-size: 19px; font-weight: 700; flex: 1; min-width: 0; }
+  .badge { font-size: 11px; color: var(--dim); background: #23283a; border-radius: 20px; padding: 1px 8px; white-space: nowrap; }
+  .x { background: none; border: 0; color: var(--dim); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+  .x:hover { background: #262b38; color: var(--tx); }
+  .sec { margin-top: 16px; }
+  .sec-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--dim); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .sec-title .link { text-transform: none; letter-spacing: 0; font-weight: 600; margin-left: auto; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; border: 0; cursor: pointer; flex-shrink: 0; box-shadow: 0 0 0 2px transparent; }
+  .dot:hover { box-shadow: 0 0 0 2px #fff4; }
+  .dot.small { width: 10px; height: 10px; cursor: default; }
+
+  .field { border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; margin: -3px -6px; cursor: text; min-height: 1.45em; transition: border-color .12s, background .12s; overflow-wrap: anywhere; }
+  .field:hover, .field:focus-visible { border-color: var(--bd2); background: #ffffff06; outline: none; }
+  .field.empty { color: #5d6478; font-style: italic; }
+  .field.desc { color: var(--dim); margin-top: 1px; }
+  .edit-input { width: calc(100% + 12px); margin: -4px -6px; padding: 3px 6px; font: inherit; color: var(--tx); background: #10131a; border: 1px solid var(--pri); border-radius: 6px; outline: none; box-shadow: 0 0 0 3px var(--pri-bg); resize: none; }
+  .name .edit-input { font-weight: 700; }
+  textarea.edit-input { min-height: 70px; font-size: 13px; }
+  .edit-help { font-size: 11px; color: var(--dim); margin-top: 6px; }
+  .kv { display: grid; grid-template-columns: 92px 1fr; gap: 9px 10px; align-items: center; }
+  .kv > .k { color: var(--dim); font-size: 13px; }
+  .num { width: 64px; }
+
+  .ref { background: none; border: 0; padding: 0; font-weight: 650; cursor: pointer; }
+  .ref:hover { text-decoration: underline; }
+  .facts { display: flex; flex-direction: column; gap: 2px; }
+  .fact { border-radius: 7px; border: 1px solid transparent; }
+  .fact.open { border-color: var(--bd2); background: #12151d; }
+  .fact-sum { display: flex; gap: 8px; align-items: center; padding: 5px 7px; cursor: pointer; border-radius: 7px; }
+  .fact-sum:hover { background: #ffffff08; }
+  .fact-sum .when { margin-left: auto; color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .chev { color: var(--dim); font-size: 10px; width: 10px; transition: transform .15s; }
+  .fact.open .chev { transform: rotate(90deg); }
+  .fact-body { padding: 4px 10px 10px 25px; display: flex; flex-direction: column; gap: 10px; }
+  .scope-note { font-size: 12px; color: var(--pri); background: var(--pri-bg); border-radius: 6px; padding: 4px 8px; }
+  .tag { font-size: 11px; border: 1px solid; border-radius: 20px; padding: 0 7px; white-space: nowrap; }
+  .strength { display: inline-flex; gap: 4px; }
+  .strength button { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--bd2); background: #1b1f29; cursor: pointer; padding: 0; }
+  .strength button.on { background: currentColor; border-color: currentColor; }
+  .pick { background: #151820; border: 1px solid var(--bd2); border-radius: 6px; padding: 3px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+  .pick:hover { border-color: #56607a; }
+  .pick::after { content: "▾"; color: var(--dim); font-size: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--bd2); border-radius: 20px; padding: 1px 4px 1px 8px; font-size: 13px; }
+  .chip .x { font-size: 14px; padding: 0 4px; }
+  .empty-hint { border: 1px dashed var(--bd2); border-radius: 8px; padding: 10px; color: var(--dim); font-size: 13px; }
+  .hint { color: var(--yel); font-size: 13px; }
+  .history { border-left: 2px solid var(--bd2); margin-left: 4px; padding-left: 12px; display: flex; flex-direction: column; gap: 5px; }
+  .history .h { font-size: 13px; position: relative; cursor: pointer; }
+  .history .h::before { content: ""; position: absolute; left: -17px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--bd2); }
+  .history .h.now::before { background: var(--pri); }
+  .history .h .when { color: var(--dim); font-size: 12px; margin-right: 6px; }
+  .drop { border: 1px dashed var(--bd2); border-radius: 8px; padding: 12px; text-align: center; color: var(--dim); font-size: 13px; cursor: pointer; }
+  .drop.over { border-color: var(--pri); background: var(--pri-bg); color: var(--tx); }
+  .thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .thumbs img { height: 64px; border-radius: 6px; border: 1px solid var(--bd2); }
+  .hero { width: 100%; border-radius: 8px; margin-top: 10px; max-height: 180px; object-fit: cover; }
+  .danger-zone { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--bd); display: flex; gap: 8px; }
+  .tplist { display: flex; flex-direction: column; gap: 3px; }
+  .tprow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; border: 1px solid transparent; background: #12151d; }
+  .tprow.over { border-color: var(--pri); }
+  .tprow .grip { cursor: grab; color: var(--dim); letter-spacing: -2px; }
+  .switch { position: relative; width: 34px; height: 19px; border-radius: 20px; background: #2a2f3c; border: 0; cursor: pointer; }
+  .switch.on { background: var(--pri); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .switch.on::after { left: 17px; }
+
+  /* Zeitspannen-Regler */
+  .range { display: flex; align-items: center; gap: 10px; }
+  .track { position: relative; flex: 1; height: 22px; cursor: pointer; margin: 0 7px; }
+  .track::before { content: ""; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--bd2); border-radius: 2px; }
+  .track .fill { position: absolute; top: 9px; height: 4px; background: var(--pri); border-radius: 2px; }
+  .track .tick { position: absolute; top: 7px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #2a2f3c; border: 1px solid var(--bd2); }
+  .track .tick.now { border-color: #fff; }
+  .track .handle { position: absolute; top: 3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #fff; border: 3px solid var(--pri); cursor: grab; padding: 0; z-index: 1; }
+  .track .handle:focus-visible { outline: 3px solid var(--pri-bg); }
+  .range-text { width: 62px; text-align: right; font-size: 12px; color: var(--dim); white-space: nowrap; }
+
+  /* Zeitleiste */
+  .timebar { left: 50%; bottom: 16px; transform: translateX(-50%); width: min(720px, calc(100% - 32px)); padding: 12px 16px 14px; }
+  .tb-head { display: flex; align-items: center; gap: 8px; }
+  .tp-name { background: none; border: 1px solid transparent; border-radius: 6px; font-weight: 650; padding: 2px 6px; margin-left: -6px; cursor: pointer; }
+  .tp-name:hover { border-color: var(--bd2); }
+  .tb-head .date { font-size: 12px; color: var(--dim); }
+  .tb-head .seg { margin-left: auto; }
+  .tb-head .seg button { font-size: 12px; padding: 3px 10px; }
+  .tb-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .slider { position: relative; flex: 1; height: 34px; cursor: pointer; }
+  .slider::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 4px; background: #2a2f3c; border-radius: 2px; }
+  .slider .tk { position: absolute; top: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); pointer-events: none; }
+  .slider .tk i { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #2a2f3c; border: 2px solid #3d4456; }
+  .slider .tk.on { color: #fff; }
+  .slider .tk.on i { width: 18px; height: 18px; margin-top: 2px; background: var(--pri); border-color: #fff; }
+
+  /* Leiste „Ohne Ort“ */
+  .tray { position: absolute; z-index: 19; left: 50%; transform: translateX(-50%); bottom: 118px; display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 30px; background: var(--ov); border: 1px solid var(--bd); font-size: 12px; color: var(--dim); max-width: calc(100% - 32px); flex-wrap: wrap; justify-content: center; }
+  .tray-chip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid; border-radius: 20px; padding: 2px 10px; cursor: grab; background: #11141b; font-size: 13px; touch-action: none; }
+  .tray-chip.fresh { animation: glow 1s 3 alternate; }
+  @keyframes glow { to { box-shadow: 0 0 0 5px var(--pri-bg); } }
+
+  /* Szene */
+  .layer { fill: rgba(107, 140, 255, 0.05); stroke: #6b8cff; stroke-width: .05; }
+  .grid { stroke: #6b8cff; stroke-opacity: .07; stroke-width: .03; }
+  [data-id] { cursor: grab; }
+  .label { font-size: .55px; text-anchor: middle; paint-order: stroke; stroke: #0b0d12; stroke-width: .18px; pointer-events: none; }
+  .label.strong { font-weight: 700; font-size: .62px; }
+  .sel-halo { fill: none; stroke: #fff; stroke-width: .07; stroke-dasharray: .25 .18; }
+  .target { fill: rgba(107,140,255,.15); stroke: var(--pri); stroke-width: .12; }
+  .rubber { stroke: #fff; stroke-width: .08; stroke-dasharray: .3 .2; }
+  .ghost-hint { font-size: .45px; fill: #5d6478; text-anchor: middle; pointer-events: none; }
+  .dragtag { position: fixed; z-index: 60; pointer-events: none; background: #111521; border: 1px solid var(--pri); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 6px; transform: translate(14px, 14px); white-space: nowrap; box-shadow: 0 6px 16px #0008; }
+  .dragtag.none { border-color: var(--bd2); color: var(--dim); }
+
+  /* Popover, Dialog, Meldungen */
+  .pop { position: fixed; z-index: 70; background: #161a24; border: 1px solid var(--bd2); border-radius: 9px; box-shadow: 0 14px 40px #000a; padding: 6px; min-width: 220px; max-width: 320px; }
+  .pop input { width: 100%; padding: 7px 9px; background: #0f1218; border: 1px solid var(--bd2); border-radius: 6px; color: var(--tx); font: inherit; outline: none; margin-bottom: 4px; }
+  .pop input:focus { border-color: var(--pri); }
+  .pop .title { font-size: 11px; color: var(--dim); text-transform: uppercase; font-weight: 700; padding: 4px 8px; letter-spacing: .05em; }
+  .opt { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; background: none; border: 0; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  .opt.hl, .opt:hover { background: #262d3e; }
+  .opt .sub { margin-left: auto; color: var(--dim); font-size: 12px; }
+  .opt.create { color: var(--pri); }
+  .pop .list { max-height: 280px; overflow-y: auto; }
+  .swatches { display: grid; grid-template-columns: repeat(6, 26px); gap: 6px; padding: 6px; }
+  .swatches button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .swatches button.on { border-color: #fff; }
+  .search { left: 50%; top: 90px; transform: translateX(-50%); width: min(520px, calc(100% - 32px)); max-width: none; padding: 10px; }
+  .search input { font-size: 16px; padding: 10px 12px; }
+  .backdrop { position: fixed; inset: 0; z-index: 65; background: #0008; }
+  .modal { position: fixed; z-index: 80; left: 50%; top: 22%; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); background: #161a24; border: 1px solid var(--bd2); border-radius: 12px; padding: 18px; box-shadow: 0 20px 60px #000c; }
+  .modal h3 { margin: 0 0 6px; font-size: 17px; }
+  .modal ul { margin: 8px 0 16px; padding-left: 20px; color: var(--dim); max-height: 200px; overflow-y: auto; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .toasts { position: fixed; z-index: 90; top: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast { background: #1b2030; border: 1px solid var(--bd2); border-radius: 9px; padding: 8px 10px 8px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px #0009; animation: drop .18s ease-out; }
+  .toast.error { border-color: var(--red); }
+  .toast.error::before { content: "⛔"; }
+  @keyframes drop { from { transform: translateY(-8px); opacity: 0; } }
+  .hint-row { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 7px; padding: 5px 7px; margin: 0 -7px; cursor: pointer; color: var(--yel); font-size: 13px; }
+  .hint-row:hover { background: #facc150d; border-color: #facc1533; }
+  .hint-row .at { font-weight: 700; color: var(--pri); }
+  .hint-row .go { margin-left: auto; color: var(--pri); white-space: nowrap; font-weight: 600; opacity: 0; }
+  .hint-row:hover .go { opacity: 1; }
+  .hintdlg { left: 16px; top: 16px; width: min(400px, calc(100% - 32px)); max-height: calc(100vh - 170px); overflow-y: auto; padding: 14px 16px; border-color: #facc1555; z-index: 30; }
+  .hintdlg .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .hintdlg .head .badge { color: var(--yel); background: #facc151a; }
+  .hintdlg .text { font-weight: 600; margin-bottom: 4px; }
+  .hintdlg .els { display: flex; gap: 10px; font-size: 13px; margin-bottom: 10px; }
+  .mini { display: grid; grid-template-columns: 110px 1fr; gap: 5px 8px; align-items: center; font-size: 12px; color: var(--dim); margin-bottom: 12px; }
+  .mini .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini .trk { position: relative; height: 12px; background: repeating-linear-gradient(90deg, #1b1f29 0 calc(100% / var(--n) - 2px), transparent 0 calc(100% / var(--n))); border-radius: 3px; }
+  .mini .bar { position: absolute; top: 2px; height: 8px; border-radius: 4px; }
+  .mini .bad { position: absolute; top: -3px; bottom: -3px; background: #f8717133; border: 1px solid #f87171; border-radius: 4px; }
+  .mini .nums { position: relative; display: flex; }
+  .mini .nums span { flex: 1; text-align: center; }
+  .mini .nums span.now { color: #fff; font-weight: 700; }
+  .fixes { display: flex; flex-direction: column; gap: 6px; }
+  .fix { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: #151820; border: 1px solid var(--bd2); border-radius: 9px; padding: 8px 10px; cursor: pointer; }
+  .fix:hover, .fix:focus-visible { border-color: var(--pri); background: #1a2032; outline: none; }
+  .fix b { display: block; }
+  .fix .pv { font-size: 12px; color: var(--dim); }
+  .fix kbd { margin-top: 2px; }
+  .hintdlg .foot { display: flex; gap: 12px; align-items: center; margin-top: 12px; font-size: 13px; }
+  .hintdlg .foot button { white-space: nowrap; }
+  .hintdlg .accept { margin-top: 10px; display: flex; gap: 6px; }
+  .hintdlg .accept input { flex: 1; padding: 6px 8px; background: #0f1218; border: 1px solid var(--pri); border-radius: 6px; color: var(--tx); font: inherit; outline: none; }
+  .done { text-align: center; padding: 10px 0 4px; }
+  .done .big { font-size: 28px; color: var(--ok); }
+  .help { position: absolute; z-index: 18; left: 16px; bottom: 16px; width: 270px; padding: 12px 14px; font-size: 12.5px; color: var(--dim); }
+  .help b { color: var(--tx); }
+  .help ul { margin: 6px 0 0; padding-left: 16px; }
+  .help li { margin: 3px 0; }
+  .proto { position: absolute; z-index: 18; right: 16px; bottom: 16px; font-size: 11px; color: #5d6478; }
+  @media (max-width: 1100px) { .help { display: none; } }
+  @media (max-width: 700px) {
+    .toolbar { right: 16px; width: auto; }
+    .panel { top: auto; bottom: 160px; max-height: 45vh; }
+    .tray { bottom: 124px; }
+  }
+</style>
+</head>
+<body>
+<svg id="scene" viewBox="-15 -12 30 24" preserveAspectRatio="xMidYMid meet" aria-label="Netz der aktuellen Ebene"></svg>
+<div id="toolbar" class="overlay toolbar"></div>
+<div id="panel" class="overlay panel" hidden></div>
+<div id="tray" class="tray" hidden></div>
+<div id="timebar" class="overlay timebar"></div>
+<div id="help" class="overlay help">
+  <div class="row"><b>Prototyp – probier das aus</b><span class="grow"></span><button class="x" id="help-x" aria-label="Schließen">×</button></div>
+  <ul>
+    <li>Person auf einen Ort ziehen, auf eine Person (Beziehung) oder auf ein Event</li>
+    <li>Ort ziehen, Doppelklick ins Leere = neuer Ort</li>
+    <li>Im Panel auf Namen, Texte, Werte klicken</li>
+    <li><kbd>N</kbd> Neu, <kbd>Strg K</kbd> Suchen und Anlegen</li>
+    <li><kbd>Strg Z</kbd>/<kbd>Strg Y</kbd>, <kbd>Entf</kbd>, <kbd>←</kbd><kbd>→</kbd></li>
+    <li>„Ab hier / Ganze Phase“ unten rechts umschalten</li>
+    <li>Oben links „Hinweise“: Widersprüche auflösen, <kbd>1</kbd>–<kbd>3</kbd>, <kbd>S</kbd>, <kbd>G</kbd></li>
+  </ul>
+</div>
+<div class="proto">Prototyp: Szene vereinfacht als 2D-Netz der aktuellen Ebene</div>
+<div id="hintdlg" class="overlay hintdlg" role="dialog" aria-label="Hinweis auflösen" hidden></div>
+<div id="toasts" class="toasts"></div>
+<div id="dragtag" class="dragtag" hidden></div>
+<div id="layer-pop"></div>
+<script>
+'use strict'
+// ---------- Daten ----------
+const PALETTE = ['#f87171', '#fb923c', '#facc15', '#a3e635', '#4ade80', '#2dd4bf', '#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fde68a', '#94a3b8']
+const T = (from = null, to = null) => ({ from, to })
+const at = (id) => ({ from: id, to: id })
+const INITIAL = {
+  title: 'Die Chronik von Velmar', note: '',
+  tps: [
+    { id: 't1', name: 'Ankunft in Velmar', date: 'Frühling, Jahr 412', note: '' },
+    { id: 't2', name: 'Das Konzil', date: 'Sommer 412', note: '' },
+    { id: 't3', name: 'Der gestohlene Brief', date: '', note: '' },
+    { id: 't4', name: 'Verrat auf Ostfels', date: 'Herbst 412', note: '' },
+    { id: 't5', name: 'Flucht in den Wald', date: '', note: '' },
+    { id: 't6', name: 'Tod im Kloster', date: 'Winter 412', note: '' },
+  ],
+  types: [
+    { id: 'rt1', name: 'Freundschaft', color: '#4ade80', directed: false, category: 'Nähe' },
+    { id: 'rt2', name: 'Liebe', color: '#f472b6', directed: true, category: 'Nähe' },
+    { id: 'rt3', name: 'Feindschaft', color: '#f87171', directed: false, category: 'Konflikt' },
+    { id: 'rt4', name: 'Misstrauen', color: '#facc15', directed: true, category: 'Konflikt' },
+  ],
+  persons: [
+    { id: 'anna', name: 'Anna', color: '#f87171', desc: 'Novizin aus dem Kloster, **neugierig** und stur.', note: '', exist: T(), images: [] },
+    { id: 'ben', name: 'Ben', color: '#fb923c', desc: 'Wirt der Taverne zum Anker.', note: '', exist: T(), images: [] },
+    { id: 'mira', name: 'Mira', color: '#c084fc', desc: 'Schreiberin am Hof.', note: '', exist: T(), images: [] },
+    { id: 'kael', name: 'Kael', color: '#38bdf8', desc: 'Hauptmann der Garde.', note: '', exist: T(), images: [] },
+    { id: 'ilya', name: 'Ilya', color: '#2dd4bf', desc: 'Gesandte aus dem Osten.', note: '', exist: T(), images: [] },
+    { id: 'corvin', name: 'Abt Corvin', color: '#fde68a', desc: 'Leitet das Kloster.', note: '', exist: T(null, 't5'), images: [] },
+    { id: 'sera', name: 'Sera', color: '#a3e635', desc: 'Taucht erst später auf.', note: '', exist: T(), images: [] },
+  ],
+  groups: [{ id: 'garde', name: 'Garde von Ostfels', color: '#94a3b8', desc: 'Wachen der Burg.', note: '', exist: T(), images: [] }],
+  places: [
+    { id: 'velmar', name: 'Velmar', color: '#818cf8', r: 3, desc: 'Hafenstadt im Westen.', note: '', exist: T(), images: [], phases: [{ id: 'p1', ...T(), x: -5, y: 3 }] },
+    { id: 'kloster', name: 'Kloster Sankt Ilm', color: '#fde68a', r: 2.2, desc: '', note: '', exist: T(), images: [], phases: [{ id: 'p2', ...T(), x: 5.5, y: 4 }] },
+    { id: 'ostfels', name: 'Burg Ostfels', color: '#94a3b8', r: 2.4, desc: '', note: '', exist: T(), images: [], phases: [{ id: 'p3', ...T(), x: 4.5, y: -5 }] },
+    { id: 'wald', name: 'Wald von Ardun', color: '#4ade80', r: 2.6, desc: '', note: '', exist: T(), images: [], phases: [{ id: 'p4', ...T(), x: -5, y: -5 }] },
+  ],
+  events: [
+    { id: 'e1', name: 'Das Konzil', color: '#818cf8', desc: '', result: 'Der Rat spaltet sich.', ...at('t2'), place: 'velmar' },
+    { id: 'e2', name: 'Der gestohlene Brief', color: '#fde68a', desc: '', result: '', ...at('t3'), place: 'kloster' },
+    { id: 'e3', name: 'Verrat auf Ostfels', color: '#f87171', desc: '', result: 'Ben und Kael werden Feinde.', ...at('t4'), place: 'ostfels' },
+    { id: 'e4', name: 'Flucht in den Wald', color: '#4ade80', desc: '', result: '', ...at('t5'), place: 'wald' },
+    { id: 'e5', name: 'Tod im Kloster', color: '#e5e7eb', desc: '', result: '', ...at('t6'), place: 'kloster' },
+    { id: 'e6', name: 'Ein Gerücht', color: '#c084fc', desc: 'Noch ohne Ort.', result: '', ...at('t3'), place: null },
+  ],
+  stays: [
+    { id: 's1', person: 'anna', place: 'velmar', ...T(null, 't2') }, { id: 's2', person: 'anna', place: 'kloster', ...T('t3', 't4') }, { id: 's3', person: 'anna', place: 'wald', ...T('t5') },
+    { id: 's4', person: 'ben', place: 'velmar', ...T(null, 't3') }, { id: 's5', person: 'ben', place: 'ostfels', ...T('t4') },
+    { id: 's6', person: 'mira', place: 'velmar', ...T(null, 't4') }, { id: 's7', person: 'mira', place: 'wald', ...T('t5') },
+    { id: 's8', person: 'kael', place: 'ostfels', ...T() },
+    { id: 's9', person: 'ilya', place: 'kloster', ...T(null, 't2') }, { id: 's10', person: 'ilya', place: 'velmar', ...T('t3') },
+    { id: 's11', person: 'corvin', place: 'kloster', ...T() },
+  ],
+  relations: [
+    { id: 'r1', a: 'anna', b: 'ben', phases: [{ id: 'rp1', ...T(null, 't3'), type: 'rt1', strength: 4 }, { id: 'rp2', ...T('t4'), type: 'rt3', strength: 2 }] },
+    { id: 'r2', a: 'anna', b: 'mira', phases: [{ id: 'rp3', ...T('t2'), type: 'rt2', strength: 3 }] },
+    { id: 'r3', a: 'mira', b: 'kael', phases: [{ id: 'rp4', ...T(), type: 'rt4', strength: 2 }] },
+    { id: 'r4', a: 'ben', b: 'kael', phases: [{ id: 'rp5', ...T(null, 't3'), type: 'rt1', strength: 3 }, { id: 'rp6', ...T('t4'), type: 'rt3', strength: 4 }] },
+    { id: 'r5', a: 'ilya', b: 'anna', phases: [{ id: 'rp7', ...T('t3'), type: 'rt4', strength: 2 }] },
+  ],
+  parts: [
+    { id: 'pa1', actor: 'anna', event: 'e1' }, { id: 'pa2', actor: 'ben', event: 'e1' }, { id: 'pa3', actor: 'mira', event: 'e1' }, { id: 'pa4', actor: 'ilya', event: 'e1' },
+    { id: 'pa5', actor: 'anna', event: 'e2' }, { id: 'pa6', actor: 'ben', event: 'e3' }, { id: 'pa7', actor: 'kael', event: 'e3' }, { id: 'pa8', actor: 'anna', event: 'e4' }, { id: 'pa9', actor: 'mira', event: 'e4' },
+  ],
+  members: [{ id: 'm1', person: 'kael', group: 'garde', ...T() }],
+  accepted: [],
+}
+const KIND = { person: 'Person', group: 'Gruppe', place: 'Ort', event: 'Event', timePoint: 'Zeitpunkt', relationType: 'Beziehungsart', book: 'Buch' }
+
+// ---------- Zustand ----------
+let book = structuredClone(INITIAL)
+let current = 1, sel = { kind: 'person', id: 'anna' }, scope = 'hier', view = 'netz'
+let hist = [], redo = [], editing = null, expanded = new Set(), saveTimer = null, saving = false, fresh = null
+let uid = 0
+const nid = (p = 'n') => `${p}${++uid}x`
+const $ = (s, el = document) => el.querySelector(s)
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>').replace(/\n/g, '<br>')
+
+// ---------- Modell-Hilfen ----------
+const tIndex = (b, id) => b.tps.findIndex((t) => t.id === id)
+const span = (b, r) => [r.from == null ? 0 : tIndex(b, r.from), r.to == null ? b.tps.length - 1 : tIndex(b, r.to)]
+const covers = (b, r, i) => { const [a, z] = span(b, r); return a <= i && i <= z }
+const setSpan = (b, r, [a, z]) => { r.from = a <= 0 ? null : b.tps[a].id; r.to = z >= b.tps.length - 1 ? null : b.tps[z].id }
+const spanText = (b, [a, z]) => { const l = b.tps.length - 1; return a === 0 && z === l ? 'immer' : a === z ? `nur ${a + 1}` : a === 0 ? `bis ${z + 1}` : z === l ? `ab ${a + 1}` : `${a + 1}–${z + 1}` }
+const lists = (b) => [['person', b.persons], ['group', b.groups], ['place', b.places], ['event', b.events], ['timePoint', b.tps], ['relationType', b.types]]
+const find = (b, id) => { for (const [kind, list] of lists(b)) { const e = list.find((x) => x.id === id); if (e) return { kind, e, list } } }
+const nameOf = (b, id) => find(b, id)?.e.name ?? '?'
+const colorOf = (b, id) => find(b, id)?.e.color ?? '#888'
+const actors = (b) => [...b.persons, ...b.groups]
+
+function placePos(b, id, i) {
+  const p = b.places.find((x) => x.id === id)
+  if (!p || !covers(b, p.exist, i)) return null
+  const ph = p.phases.find((h) => covers(b, h, i))
+  return ph ? [ph.x, ph.y] : null
+}
+function stayAt(b, pid, i) { return b.stays.find((s) => s.person === pid && covers(b, s, i)) }
+function personPos(b, id, i) {
+  const k = b.persons.findIndex((p) => p.id === id)
+  const p = b.persons[k]
+  if (!p || !covers(b, p.exist, i)) return null
+  const s = stayAt(b, id, i)
+  const c = s && placePos(b, s.place, i)
+  if (!c) return null
+  const r = Math.min(1.3, b.places.find((x) => x.id === s.place).r * 0.6)
+  const angle = k * 2.39996
+  return [c[0] + Math.cos(angle) * r, c[1] + Math.sin(angle) * r]
+}
+const eventPos = (b, e, i) => (e.place && covers(b, e, i) ? placePos(b, e.place, i) : null)
+
+function focusSet(b, id) {
+  if (!id) return null
+  const ids = new Set([id])
+  for (const s of b.stays) if (s.person === id || s.place === id) { ids.add(s.person); ids.add(s.place) }
+  for (const r of b.relations) if (r.a === id || r.b === id) { ids.add(r.a); ids.add(r.b) }
+  for (const p of b.parts) if (p.actor === id || p.event === id) { ids.add(p.actor); ids.add(p.event) }
+  for (const e of b.events) if (e.id === id && e.place) ids.add(e.place)
+  return ids
+}
+
+// Verbote: Zeit rückwärts und überlappende Phasen machen das Modell uneindeutig
+function problems(b) {
+  const out = []
+  const check = (r, what) => { const [a, z] = span(b, r); if (a > z) out.push(`${what} würde vor ihrem Beginn enden`) }
+  for (const [, list] of lists(b)) for (const e of list) if (e.exist) check(e.exist, `Existenz von ${e.name}`)
+  for (const e of b.events) check(e, e.name)
+  for (const s of b.stays) check(s, `Aufenthalt ${nameOf(b, s.person)} in ${nameOf(b, s.place)}`)
+  for (const m of b.members) check(m, `Mitgliedschaft von ${nameOf(b, m.person)}`)
+  const overlap = (phases, what) => phases.forEach((p, i) => { check(p, what); phases.slice(i + 1).forEach((q) => { const [a, z] = span(b, p), [c, d] = span(b, q); if (Math.max(a, c) <= Math.min(z, d)) out.push(`Phasen von ${what} überschneiden sich`) }) })
+  for (const p of b.places) overlap(p.phases, p.name)
+  for (const r of b.relations) overlap(r.phases, `${nameOf(b, r.a)} – ${nameOf(b, r.b)}`)
+  return out
+}
+// Hinweise: erlaubte Widersprüche
+const range = ([a, z]) => Array.from({ length: Math.max(0, z - a + 1) }, (_, k) => a + k)
+/** Erkannt über Regel und beteiligte IDs; `els` sind die Elemente, bei denen der Hinweis erscheint */
+function hints(b, all = false) {
+  const out = []
+  const add = (rule, ids, els, at, text) => out.push({ rule, ids, els, at, text, key: `${rule}:${ids.join(',')}` })
+  for (const p of b.persons) {
+    const own = b.stays.filter((s) => s.person === p.id)
+    own.forEach((s, k) => own.slice(k + 1).forEach((t) => {
+      const [a, z] = span(b, s), [c, d] = span(b, t), lo = Math.max(a, c), hi = Math.min(z, d)
+      if (lo > hi) return
+      const [e, l] = a <= c ? [s, t] : [t, s]
+      add('two-places', [e.id, l.id], [p.id], lo, `${p.name} ist ${spanText(b, [lo, hi]).replace('nur ', 'auf ')} gleichzeitig in ${nameOf(b, e.place)} und ${nameOf(b, l.place)}`)
+    }))
+  }
+  const outside = (fact, actor, what) => {
+    const e = find(b, actor).e, life = span(b, e.exist), sp = span(b, fact)
+    const k = range(sp).find((i) => i < life[0] || i > life[1])
+    if (k !== undefined) add('outside-existence', [fact.id, actor], [actor], k, `${what} (${spanText(b, sp)}) liegt außerhalb der Existenz von ${e.name} (${spanText(b, life)})`)
+  }
+  for (const s of b.stays) outside(s, s.person, `Aufenthalt in ${nameOf(b, s.place)}`)
+  for (const r of b.relations) for (const ph of r.phases) for (const x of [r.a, r.b]) outside(ph, x, `Beziehung ${nameOf(b, r.a)} – ${nameOf(b, r.b)}`)
+  for (const pa of b.parts) {
+    const ev = find(b, pa.event).e
+    if (!ev.place || !b.persons.some((p) => p.id === pa.actor)) continue
+    const k = range(span(b, ev)).find((i) => { const s = stayAt(b, pa.actor, i); return s && s.place !== ev.place })
+    if (k !== undefined) add('elsewhere', [pa.id], [pa.actor, ev.id], k, `${nameOf(b, pa.actor)} ist bei „${ev.name}“ (${k + 1}), aber in ${nameOf(b, stayAt(b, pa.actor, k).place)}`)
+  }
+  out.sort((x, y) => x.at - y.at)
+  return all ? out : out.filter((h) => !b.accepted.some((a) => a.key === h.key))
+}
+/** Fakt mit Zeitspanne über seine ID: Aufenthalt oder Beziehungsphase */
+function factById(b, id) {
+  const stay = b.stays.find((s) => s.id === id)
+  if (stay) return { fact: stay, list: b.stays, what: `Aufenthalt in ${nameOf(b, stay.place)}` }
+  for (const r of b.relations) { const p = r.phases.find((x) => x.id === id); if (p) return { fact: p, list: r.phases, rel: r, what: `Beziehungsphase ${nameOf(b, r.a)} – ${nameOf(b, r.b)}` } }
+}
+const removeFact = (b, id) => { const f = factById(b, id); f.list.splice(f.list.indexOf(f.fact), 1); if (f.rel && !f.rel.phases.length) b.relations.splice(b.relations.indexOf(f.rel), 1) }
+/** Lösungen zu einem Hinweis; `rows` zeichnen den Mini-Zeitstrahl, `bad` markiert den Widerspruch */
+function fixes(b, h) {
+  if (h.rule === 'two-places') {
+    const [e, l] = h.ids.map((id) => b.stays.find((s) => s.id === id)), [a, z] = span(b, e), [c, d] = span(b, l)
+    const E = nameOf(b, e.place), L = nameOf(b, l.place)
+    const list = []
+    if (a < c) list.push({ label: `${E} endet vor ${L}`, preview: `${E}: ${spanText(b, [a, c - 1])}, ${L}: ${spanText(b, [c, d])}`, op: (x) => setSpan(x, x.stays.find((s) => s.id === e.id), [a, c - 1]) })
+    if (z < d) list.push({ label: `${L} beginnt nach ${E}`, preview: `${E}: ${spanText(b, [a, z])}, ${L}: ${spanText(b, [z + 1, d])}`, op: (x) => setSpan(x, x.stays.find((s) => s.id === l.id), [z + 1, d]) })
+    list.push({ label: `Aufenthalt in ${L} entfernen`, preview: `nur noch ${E}: ${spanText(b, [a, z])}`, op: (x) => removeFact(x, l.id) })
+    return { list, rows: [{ label: E, sp: [a, z], color: colorOf(b, e.place) }, { label: L, sp: [c, d], color: colorOf(b, l.place) }], bad: [Math.max(a, c), Math.min(z, d)] }
+  }
+  if (h.rule === 'outside-existence') {
+    const { fact, what } = factById(b, h.ids[0]), actor = find(b, h.ids[1]).e
+    const sp = span(b, fact), life = span(b, actor.exist), lo = Math.max(sp[0], life[0]), hi = Math.min(sp[1], life[1])
+    const union = [Math.min(sp[0], life[0]), Math.max(sp[1], life[1])]
+    const list = [{ label: `Existenz von ${actor.name} erweitern`, preview: `${actor.name} existiert ${spanText(b, union)}`, op: (x) => setSpan(x, find(x, actor.id).e.exist, union) }]
+    if (lo <= hi) list.push({ label: 'Auf die Existenz kürzen', preview: `${what}: ${spanText(b, [lo, hi])}`, op: (x) => setSpan(x, factById(x, fact.id).fact, [lo, hi]) })
+    list.push({ label: `${what.split(' ')[0]} entfernen`, preview: `${what} (${spanText(b, sp)}) fällt weg`, op: (x) => removeFact(x, fact.id) })
+    return { list, rows: [{ label: `Existenz ${actor.name}`, sp: life, color: '#8b93a7' }, { label: what, sp, color: actor.color }], bad: sp[0] < life[0] ? [sp[0], Math.min(sp[1], life[0] - 1)] : [Math.max(sp[0], life[1] + 1), sp[1]] }
+  }
+  const pa = b.parts.find((p) => p.id === h.ids[0]), ev = find(b, pa.event).e, es = span(b, ev), P = nameOf(b, ev.place), who = nameOf(b, pa.actor)
+  const stay = stayAt(b, pa.actor, h.at)
+  return {
+    list: [
+      { label: `Während „${ev.name}“ in ${P}`, preview: `${who}: ${spanText(b, es)} in ${P}, davor und danach wie bisher`, op: (x) => {
+        for (const s of x.stays.filter((s) => s.person === pa.actor)) {
+          const [a, z] = span(x, s)
+          if (z < es[0] || a > es[1]) continue
+          x.stays.splice(x.stays.indexOf(s), 1)
+          if (a < es[0]) { const q = { ...s, id: nid('s') }; setSpan(x, q, [a, es[0] - 1]); x.stays.push(q) }
+          if (z > es[1]) { const q = { ...s, id: nid('s') }; setSpan(x, q, [es[1] + 1, z]); x.stays.push(q) }
+        }
+        const n = { id: nid('s'), person: pa.actor, place: ev.place, from: null, to: null }; setSpan(x, n, es); x.stays.push(n)
+      } },
+      { label: 'Teilnahme entfernen', preview: `${who} ist nicht bei „${ev.name}“`, op: (x) => { x.parts = x.parts.filter((p) => p.id !== pa.id) } },
+    ],
+    rows: [{ label: ev.name, sp: es, color: ev.color }, { label: `${who} in ${nameOf(b, stay.place)}`, sp: span(b, stay), color: colorOf(b, pa.actor) }],
+    bad: [Math.max(es[0], span(b, stay)[0]), Math.min(es[1], span(b, stay)[1])],
+  }
+}
+
+// ---------- Änderungen ----------
+/** Ändert die zum Zeitpunkt i gültige Phase; „ab hier“ teilt sie vorher */
+function change(b, phases, i, mutate, host = phases) {
+  const p = phases.find((h) => covers(b, h, i))
+  if (!p) return null
+  const [a, z] = span(b, p)
+  if (scope === 'ganz' || a === i) { mutate(p); return p }
+  const q = structuredClone(p)
+  q.id = nid('ph'); delete q.note; delete q.causedBy
+  setSpan(b, p, [a, i - 1]); setSpan(b, q, [i, z]); mutate(q)
+  host.splice(host.indexOf(p) + 1, 0, q)
+  return q
+}
+/** Führt direkt aufeinanderfolgende Phasen mit gleichem Inhalt zusammen */
+function merge(b, phases, same, host = phases) {
+  const sorted = [...phases].sort((p, q) => span(b, p)[0] - span(b, q)[0])
+  for (let k = 1; k < sorted.length; k++) {
+    const p = sorted[k - 1], q = sorted[k]
+    if (span(b, p)[1] + 1 === span(b, q)[0] && same(p, q)) { p.to = q.to; host.splice(host.indexOf(q), 1); sorted.splice(k--, 1) }
+  }
+}
+function tidy(b) {
+  for (const pid of new Set(b.stays.map((s) => s.person))) merge(b, b.stays.filter((s) => s.person === pid), (p, q) => p.place === q.place, b.stays)
+  for (const r of b.relations) merge(b, r.phases, (p, q) => p.type === q.type && p.strength === q.strength)
+  for (const pl of b.places) merge(b, pl.phases, (p, q) => p.x === q.x && p.y === q.y)
+}
+const splits = (r) => scope === 'hier' && r && span(book, r)[0] < current
+
+function apply(label, fn, after) {
+  const next = structuredClone(book)
+  const result = fn(next)
+  if (result === false) return false
+  tidy(next)
+  const before = problems(book).length
+  const now = problems(next)
+  if (now.length > before) { toast(`Nicht möglich: ${now[now.length - 1]}`, { error: true }); render(); return false }
+  hist.push({ label, before: book, after: next, sel, current })
+  if (hist.length > 200) hist.shift()
+  redo = []
+  book = next
+  after?.()
+  save()
+  render()
+  return true
+}
+function undo() {
+  const s = hist.pop(); if (!s) return
+  redo.push(s); book = s.before; sel = s.sel && find(book, s.sel.id) || s.sel?.kind === 'book' ? s.sel : null
+  current = Math.min(s.current, book.tps.length - 1); editing = null; save(); render(); toast(`Rückgängig: ${s.label}`)
+}
+function redoStep() {
+  const s = redo.pop(); if (!s) return
+  hist.push(s); book = s.after; current = Math.min(s.current, book.tps.length - 1); editing = null; save(); render(); toast(`Wiederholt: ${s.label}`)
+}
+function save() {
+  saving = true; clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => { saving = false; renderToolbar() }, 450)
+}
+const initialById = new Map()
+for (const list of [...lists(INITIAL).map((l) => l[1]), INITIAL.stays, INITIAL.relations, INITIAL.parts, INITIAL.members]) for (const e of list) initialById.set(e.id, JSON.stringify(e))
+function changeCount() {
+  let n = (book.title !== INITIAL.title || book.note !== INITIAL.note ? 1 : 0) + (book.accepted.length ? 1 : 0)
+  const seen = new Set()
+  for (const list of [...lists(book).map((l) => l[1]), book.stays, book.relations, book.parts, book.members]) for (const e of list) { seen.add(e.id); if (initialById.get(e.id) !== JSON.stringify(e)) n++ }
+  for (const id of initialById.keys()) if (!seen.has(id)) n++
+  return n
+}
+
+function movePlace(b, id, i, x, y) {
+  const p = b.places.find((q) => q.id === id)
+  change(b, p.phases, i, (ph) => { ph.x = round(x); ph.y = round(y) })
+}
+const round = (v) => Math.round(v * 10) / 10
+function moveTo(b, pid, placeId, i) {
+  const own = b.stays.filter((s) => s.person === pid)
+  const s = own.find((x) => covers(b, x, i))
+  if (s) { if (s.place === placeId) return false; change(b, own, i, (x) => { x.place = placeId }, b.stays); return }
+  const next = own.map((x) => span(b, x)[0]).filter((a) => a > i).sort((a, c) => a - c)[0]
+  const stay = { id: nid('s'), person: pid, place: placeId, from: null, to: null }
+  setSpan(b, stay, [i, next === undefined ? b.tps.length - 1 : next - 1])
+  b.stays.push(stay)
+}
+/** Verbindet a mit c; eine gerichtete Art zeigt immer von a (gezogen) nach c (Ziel) */
+function connect(b, a, c, typeId, i) {
+  const isDir = (t) => b.types.find((x) => x.id === t)?.directed
+  const directed = isDir(typeId)
+  const between = b.relations.filter((r) => (r.a === a && r.b === c) || (r.a === c && r.b === a))
+  // In Zugrichtung: a → c oder ungerichtet zwischen beiden; eine gerichtete c → a bleibt unberührt
+  const live = between.find((r) => r.phases.some((p) => covers(b, p, i) && (r.a === a || !isDir(p.type))))
+  if (live && (live.a === a || !directed)) return change(b, live.phases, i, (p) => { p.type = typeId })
+  let wanted = [i, b.tps.length - 1]
+  if (live) {
+    // andersherum gespeichert, neue Art gerichtet: dort endet sie, a → c beginnt
+    const p = live.phases.find((x) => covers(b, x, i)), [s0, s1] = span(b, p)
+    if (scope === 'hier' && s0 < i) setSpan(b, p, [s0, i - 1]); else live.phases.splice(live.phases.indexOf(p), 1)
+    if (!live.phases.length) b.relations.splice(b.relations.indexOf(live), 1)
+    wanted = [scope === 'hier' ? i : s0, s1]
+  }
+  const target = between.find((r) => r.a === a && b.relations.includes(r)) ?? (!directed ? between.find((r) => r.a === c && b.relations.includes(r)) : undefined)
+  const spans = (target?.phases ?? []).map((p) => span(b, p))
+  const start = Math.max(wanted[0], ...spans.filter((s) => s[1] < i).map((s) => s[1] + 1))
+  const end = Math.min(wanted[1], ...spans.filter((s) => s[0] > i).map((s) => s[0] - 1))
+  const phase = { id: nid('rp'), from: null, to: null, type: typeId, strength: 3 }
+  setSpan(b, phase, [start, end])
+  if (target) target.phases.push(phase)
+  else b.relations.push({ id: nid('r'), a, b: c, phases: [phase] })
+}
+function nextColor(b) {
+  const used = new Set(lists(b).flatMap(([, l]) => l.map((e) => e.color)))
+  return PALETTE.find((c) => !used.has(c)) ?? PALETTE[(b.persons.length + b.places.length) % PALETTE.length]
+}
+function freeSpot(b, i) {
+  for (let k = 0; k < 60; k++) {
+    const a = k * 2.4, r = 2 + k * 0.35, x = round(Math.cos(a) * r), y = round(Math.sin(a) * r)
+    if (Math.abs(x) < 9 && Math.abs(y) < 9 && b.places.every((p) => { const q = placePos(b, p.id, i); return !q || Math.hypot(q[0] - x, q[1] - y) > p.r + 2.6 })) return [x, y]
+  }
+  return [0, 0]
+}
+function create(kind, name, extra = {}) {
+  const LABEL = { person: 'Neue Person', group: 'Neue Gruppe', place: 'Neuer Ort', event: 'Neues Event', timePoint: 'Neuer Zeitpunkt' }
+  let id
+  const ok = apply(`${KIND[kind]} angelegt`, (b) => {
+    id = nid(kind[0])
+    const base = { id, name: name || LABEL[kind], color: nextColor(b), desc: '', note: '', images: [] }
+    if (kind === 'person') b.persons.push({ ...base, exist: T() })
+    if (kind === 'group') b.groups.push({ ...base, exist: T() })
+    if (kind === 'place') { const [x, y] = extra.pos ?? freeSpot(b, current); b.places.push({ ...base, r: 2.2, exist: T(), phases: [{ id: nid('ph'), ...T(), x: round(x), y: round(y) }] }) }
+    if (kind === 'event') b.events.push({ ...base, result: '', ...at(b.tps[current].id), place: extra.place ?? null })
+    if (kind === 'timePoint') { b.tps.splice(current + 1, 0, { id, name: name || LABEL[kind], date: '', note: '' }) }
+  }, () => {
+    if (kind === 'timePoint') current++
+    sel = { kind, id }
+    editing = { key: `name:${id}`, select: !name }
+    if (kind === 'person') fresh = id
+  })
+  return ok ? id : null
+}
+
+// ---------- Löschen ----------
+function dependents(b, id) {
+  const f = find(b, id); if (!f) return []
+  const n = (x) => nameOf(b, x)
+  const out = []
+  if (f.kind === 'person' || f.kind === 'group') {
+    for (const s of b.stays) if (s.person === id) out.push(`Aufenthalt in ${n(s.place)} (${spanText(b, span(b, s))})`)
+    for (const m of b.members) if (m.person === id || m.group === id) out.push(`Mitgliedschaft ${n(m.person)} in ${n(m.group)}`)
+    for (const p of b.parts) if (p.actor === id) out.push(`Teilnahme an ${n(p.event)}`)
+    for (const r of b.relations) if (r.a === id || r.b === id) out.push(`Beziehung zu ${n(r.a === id ? r.b : r.a)}`)
+  }
+  if (f.kind === 'place') {
+    for (const s of b.stays) if (s.place === id) out.push(`Aufenthalt von ${n(s.person)}`)
+    for (const e of b.events) if (e.place === id) out.push(`${e.name} verliert den Ort (bleibt erhalten)`)
+  }
+  if (f.kind === 'event') for (const p of b.parts) if (p.event === id) out.push(`Teilnahme von ${n(p.actor)}`)
+  if (f.kind === 'relationType') for (const r of b.relations) for (const p of r.phases) if (p.type === id) out.push(`Phase ${n(r.a)} – ${n(r.b)} (${spanText(b, span(b, p))})`)
+  if (f.kind === 'timePoint') {
+    let moved = 0
+    for (const r of allRanges(b)) { if (r.from === id && r.to === id) out.push(`${r.label} gilt nur hier und wird gelöscht`); else if (r.from === id || r.to === id) moved++ }
+    if (moved) out.push(`${moved} Zeitangaben rücken auf den Nachbarn`)
+  }
+  return out
+}
+function allRanges(b) {
+  const n = (x) => nameOf(b, x)
+  return [
+    ...lists(b).flatMap(([, l]) => l.filter((e) => e.exist).map((e) => Object.assign(e.exist, { label: e.name }))),
+    ...b.places.flatMap((p) => p.phases.map((h) => Object.assign(h, { label: `Lage von ${p.name}` }))),
+    ...b.events.map((e) => Object.assign(e, { label: e.name })),
+    ...b.stays.map((s) => Object.assign(s, { label: `Aufenthalt ${n(s.person)} in ${n(s.place)}` })),
+    ...b.members.map((m) => Object.assign(m, { label: `Mitgliedschaft ${n(m.person)}` })),
+    ...b.relations.flatMap((r) => r.phases.map((h) => Object.assign(h, { label: `Beziehung ${n(r.a)} – ${n(r.b)}` }))),
+  ]
+}
+function removeElement(b, id) {
+  const f = find(b, id)
+  if (f.kind === 'timePoint') {
+    const k = tIndex(b, id), prev = b.tps[k - 1]?.id, next = b.tps[k + 1]?.id
+    const gone = new Set()
+    for (const r of allRanges(b)) {
+      if (r.from === id && r.to === id) { gone.add(r); continue }
+      if (r.from === id) r.from = k === 1 ? null : (next ?? prev)
+      if (r.to === id) r.to = k === b.tps.length - 2 ? null : (prev ?? next)
+    }
+    b.events = b.events.filter((e) => !gone.has(e)); b.stays = b.stays.filter((s) => !gone.has(s)); b.members = b.members.filter((m) => !gone.has(m))
+    b.relations.forEach((r) => { r.phases = r.phases.filter((p) => !gone.has(p)) })
+    b.places.forEach((p) => { p.phases = p.phases.filter((h) => !gone.has(h)) })
+  }
+  f.list.splice(f.list.indexOf(f.e), 1)
+  b.stays = b.stays.filter((s) => s.person !== id && s.place !== id)
+  b.members = b.members.filter((m) => m.person !== id && m.group !== id)
+  b.parts = b.parts.filter((p) => p.actor !== id && p.event !== id)
+  b.relations = b.relations.filter((r) => r.a !== id && r.b !== id)
+  b.relations.forEach((r) => { r.phases = r.phases.filter((p) => p.type !== id) })
+  b.relations = b.relations.filter((r) => r.phases.length)
+  b.events.forEach((e) => { if (e.place === id) e.place = null })
+}
+function del(id) {
+  const f = find(book, id); if (!f) return
+  if (f.kind === 'timePoint' && book.tps.length === 1) return toast('Der letzte Zeitpunkt lässt sich nicht löschen', { error: true })
+  const name = f.e.name
+  const go = () => apply(`${name} gelöscht`, (b) => removeElement(b, id), () => { sel = null; current = Math.min(current, book.tps.length - 1) }) && toast(`${KIND[f.kind]} „${name}“ gelöscht`, { undo: true })
+  const deps = dependents(book, id)
+  if (!deps.length) return go()
+  modal(`${name} löschen?`, `Damit ändert sich auch:`, deps, 'Löschen', go)
+}
+
+// ---------- Darstellung: Szene ----------
+const svg = $('#scene')
+const P = ([x, y]) => `${x},${-y}`
+let preview = null, drag = null
+function renderScene() {
+  const b = preview ?? book, i = current
+  const focus = focusSet(b, sel?.id)
+  const op = (id) => (!focus || focus.has(id) ? 1 : 0.16)
+  let s = `<rect class="layer" x="-11" y="-11" width="22" height="22" rx=".25"/>`
+  const bg = b.tps.slice(0, i + 1).findLast((t) => t.bg)?.bg
+  if (bg) s += `<image href="${bg.url}" x="${bg.x - bg.w / 2}" y="${-bg.y - bg.w / 2}" width="${bg.w}" height="${bg.w}" opacity=".35" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>`
+  for (let k = -10; k <= 10; k += 2) s += `<line class="grid" x1="${k}" y1="-11" x2="${k}" y2="11"/><line class="grid" x1="-11" y1="${k}" x2="11" y2="${k}"/>`
+  for (const p of b.places) {
+    const pos = placePos(b, p.id, i); if (!pos) continue
+    const isSel = sel?.id === p.id
+    s += `<g data-kind="place" data-id="${p.id}" opacity="${op(p.id)}" transform="translate(${P(pos)})">
+      <circle r="${p.r}" fill="${p.color}" fill-opacity=".06" stroke="${p.color}" stroke-width="${isSel ? 0.2 : 0.12}"/>
+      ${isSel ? `<circle class="sel-halo" r="${p.r + 0.35}"/>` : ''}
+      <text class="label" y="${p.r + 0.8}" fill="${p.color}">${esc(p.name)}</text></g>`
+  }
+  for (const r of b.relations) {
+    const ph = r.phases.find((h) => covers(b, h, i)); if (!ph) continue
+    const a = personPos(b, r.a, i), c = personPos(b, r.b, i); if (!a || !c) continue
+    const type = b.types.find((t) => t.id === ph.type); if (!type) continue
+    const o = !focus || r.a === sel?.id || r.b === sel?.id ? 1 : 0.12
+    s += `<line x1="${a[0]}" y1="${-a[1]}" x2="${c[0]}" y2="${-c[1]}" stroke="${type.color}" stroke-width="${0.04 + ph.strength * 0.045}" opacity="${o}" ${type.directed ? 'marker-end="url(#arrow-' + type.id + ')"' : ''}/>`
+  }
+  for (const e of b.events) {
+    const pos = eventPos(b, e, i); if (!pos) continue
+    const isSel = sel?.id === e.id
+    s += `<g data-kind="event" data-id="${e.id}" opacity="${op(e.id)}" transform="translate(${P(pos)})"><path d="M0,-.55 L.45,0 L0,.55 L-.45,0Z" fill="${e.color}" stroke="${isSel ? '#fff' : '#0b0d12'}" stroke-width=".06"/></g>`
+  }
+  for (const p of b.persons) {
+    const pos = personPos(b, p.id, i); if (!pos) continue
+    const isSel = sel?.id === p.id
+    s += `<g data-kind="person" data-id="${p.id}" opacity="${op(p.id)}" transform="translate(${P(pos)})">
+      <circle r=".42" fill="${p.color}" stroke="#0b0d12" stroke-width=".06"/>${isSel ? '<circle class="sel-halo" r=".68"/>' : ''}
+      <text class="label strong" y="-.7" fill="${p.color}">${esc(p.name)}</text></g>`
+  }
+  s += `<text class="ghost-hint" x="0" y="11.7">Doppelklick ins Leere legt einen Ort an</text>`
+  // Pfeilspitze endet knapp vor der Kugel der Zielperson: 10 Einheiten = 0,6 Welt, Abstand 0,5
+  const defs = b.types.filter((t) => t.directed).map((t) => `<marker id="arrow-${t.id}" viewBox="0 0 10 10" refX="18" refY="5" markerWidth=".6" markerHeight=".6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10z" fill="${t.color}"/></marker>`).join('')
+  svg.innerHTML = `<defs>${defs}</defs>${s}<g id="overlay"></g>`
+}
+function toWorld(e) {
+  const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse())
+  return [p.x, -p.y]
+}
+const dist = (a, c) => Math.hypot(a[0] - c[0], a[1] - c[1])
+/** Ziel unter dem Zeiger: Person, dann Event, dann innerster Ring */
+function resolveDrop(b, i, pt, src) {
+  const person = b.persons.find((p) => p.id !== src && (personPos(b, p.id, i) ? dist(personPos(b, p.id, i), pt) < 0.65 : false))
+  if (person) return { kind: 'person', id: person.id }
+  const ev = b.events.find((e) => e.id !== src && eventPos(b, e, i) && dist(eventPos(b, e, i), pt) < 0.65)
+  if (ev) return { kind: 'event', id: ev.id }
+  const ring = b.places.filter((p) => placePos(b, p.id, i) && dist(placePos(b, p.id, i), pt) < p.r).sort((a, c) => a.r - c.r)[0]
+  return ring ? { kind: 'place', id: ring.id } : null
+}
+function describeDrop(src, t) {
+  const n = (id) => nameOf(book, id), when = scope === 'hier' ? `ab ${current + 1}` : 'ganze Phase'
+  if (!t) return null
+  if (src.kind === 'person') {
+    if (t.kind === 'place') return stayAt(book, src.id, current)?.place === t.id ? null : `${n(src.id)} → ${n(t.id)}: Aufenthalt ${when}`
+    if (t.kind === 'person') return `${n(src.id)} → ${n(t.id)}: Beziehung ab ${current + 1}, Art wählen …`
+    if (t.kind === 'event') return book.parts.some((p) => p.actor === src.id && p.event === t.id) ? null : `${n(src.id)} nimmt teil an ${n(t.id)}`
+  }
+  if (src.kind === 'event' && t.kind === 'place') return `${n(src.id)} findet in ${n(t.id)} statt`
+  return null
+}
+function startDrag(e, kind, id, fromTray) {
+  e.preventDefault()
+  drag = { kind, id, start: toWorld(e), pt: toWorld(e), moved: false, fromTray, offset: null }
+  if (kind === 'place') { const pos = placePos(book, id, current); drag.offset = [pos[0] - drag.start[0], pos[1] - drag.start[1]] }
+}
+svg.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return
+  closePop()
+  const g = e.target.closest('[data-id]')
+  if (g) startDrag(e, g.dataset.kind, g.dataset.id, false)
+  else drag = { kind: 'empty', start: toWorld(e), pt: toWorld(e), moved: false }
+})
+addEventListener('pointermove', (e) => {
+  if (!drag) return
+  drag.pt = toWorld(e)
+  if (!drag.moved && (drag.fromTray || dist(drag.pt, drag.start) > 0.25)) drag.moved = true
+  if (!drag.moved || drag.kind === 'empty') return
+  const tag = $('#dragtag')
+  if (drag.kind === 'place') {
+    preview = structuredClone(book)
+    movePlace(preview, drag.id, current, drag.pt[0] + drag.offset[0], drag.pt[1] + drag.offset[1])
+    renderScene()
+    tag.hidden = false; tag.className = 'dragtag'; tag.textContent = `${nameOf(book, drag.id)} verschieben · ${scope === 'hier' ? `ab ${current + 1}` : 'ganze Phase'}`
+  } else {
+    const target = resolveDrop(book, current, drag.pt, drag.id)
+    const text = describeDrop(drag, target)
+    const from = drag.fromTray ? drag.start : drag.kind === 'person' ? personPos(book, drag.id, current) : eventPos(book, find(book, drag.id).e, current)
+    let o = `<line class="rubber" x1="${from[0]}" y1="${-from[1]}" x2="${drag.pt[0]}" y2="${-drag.pt[1]}"/>`
+    if (text && target) {
+      const tp = target.kind === 'place' ? placePos(book, target.id, current) : target.kind === 'person' ? personPos(book, target.id, current) : eventPos(book, find(book, target.id).e, current)
+      const r = target.kind === 'place' ? book.places.find((p) => p.id === target.id).r : 0.75
+      o += `<circle class="target" cx="${tp[0]}" cy="${-tp[1]}" r="${r}"/>`
+    }
+    o += `<circle cx="${drag.pt[0]}" cy="${-drag.pt[1]}" r=".3" fill="${colorOf(book, drag.id)}" opacity=".9"/>`
+    $('#overlay').innerHTML = o
+    tag.hidden = false; tag.className = text ? 'dragtag' : 'dragtag none'; tag.textContent = text ?? 'Loslassen bricht ab'
+    drag.target = text ? target : null
+  }
+  tag.style.left = e.clientX + 'px'; tag.style.top = e.clientY + 'px'
+})
+addEventListener('pointerup', (e) => {
+  if (!drag) return
+  const d = drag; drag = null; preview = null; $('#dragtag').hidden = true
+  if (!d.moved) {
+    if (d.kind === 'empty') { if (sel) { sel = null; editing = null; render() } return }
+    if (!d.fromTray) { sel = { kind: d.kind, id: d.id }; editing = null; render() }
+    return
+  }
+  if (d.kind === 'empty') return
+  if (d.kind === 'place') {
+    const [x, y] = [d.pt[0] + d.offset[0], d.pt[1] + d.offset[1]]
+    apply(`Lage von ${nameOf(book, d.id)}`, (b) => movePlace(b, d.id, current, x, y))
+    return
+  }
+  const t = d.target
+  if (!t) return render()
+  const n = (id) => nameOf(book, id)
+  if (d.kind === 'person' && t.kind === 'place') apply(`${n(d.id)} nach ${n(t.id)}`, (b) => moveTo(b, d.id, t.id, current), () => { sel = { kind: 'person', id: d.id } })
+  else if (d.kind === 'person' && t.kind === 'event') apply(`${n(d.id)} bei ${n(t.id)}`, (b) => { b.parts.push({ id: nid('pa'), actor: d.id, event: t.id }) })
+  else if (d.kind === 'person' && t.kind === 'person') { render(); typeMenu(e.clientX, e.clientY, d.id, t.id) }
+  else if (d.kind === 'event' && t.kind === 'place') apply(`${n(d.id)} in ${n(t.id)}`, (b) => { b.events.find((x) => x.id === d.id).place = t.id })
+})
+svg.addEventListener('dblclick', (e) => {
+  if (e.target.closest('[data-id]')) return
+  const [x, y] = toWorld(e)
+  if (Math.abs(x) > 11 || Math.abs(y) > 11) return
+  create('place', '', { pos: [x, y] })
+})
+function typeMenu(x, y, a, c) {
+  openPop(x, y, {
+    title: `${nameOf(book, a)} → ${nameOf(book, c)}`,
+    items: book.types.map((t) => ({ id: t.id, label: t.name, color: t.color, sub: `${nameOf(book, a)} ${t.directed ? '→' : '↔'} ${nameOf(book, c)}` })),
+    createLabel: (q) => `Neue Art „${q}“`,
+    onPick: (id) => apply(`Beziehung ${nameOf(book, a)} – ${nameOf(book, c)}`, (b) => connect(b, a, c, id, current), () => { sel = { kind: 'person', id: a } }),
+    onCreate: (q) => {
+      let tid
+      apply(`Beziehungsart ${q}`, (b) => { tid = nid('rt'); b.types.push({ id: tid, name: q, color: nextColor(b), directed: false, category: '' }); connect(b, a, c, tid, current) })
+    },
+  })
+}
+
+// ---------- Darstellung: Werkzeugleiste, Zeitleiste, Leiste ----------
+function renderToolbar() {
+  const h = hints(book), changes = changeCount(), last = hist.at(-1), next = redo.at(-1)
+  $('#toolbar').innerHTML = `
+    <div>
+      <button class="book-title" data-open="book" title="Buch bearbeiten">${esc(book.title)}</button>
+      <div class="meta">
+        <span>Beispielbuch · lokal</span>
+        <span class="save ${saving ? 'busy' : ''}"><i></i>${saving ? 'Speichert …' : 'Gespeichert'}</span>
+      </div>
+      <div class="meta" style="margin-top:2px">
+        ${changes ? `<button class="link" data-open="book" title="Beim Beispielbuch: im Buch-Panel zurücksetzen. Bei echten Büchern: Link zur GitHub-Seite">${changes} Änderungen</button>` : '<span>Keine Änderungen</span>'}
+        ${h.length ? `<button class="link warn" data-hints>${h.length} Hinweise auflösen</button>` : ''}
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn icon" data-undo ${last ? '' : 'disabled'} title="${last ? `Rückgängig: ${esc(last.label)}` : 'Nichts rückgängig zu machen'} (Strg+Z)" aria-label="Rückgängig">↶</button>
+      <button class="btn icon" data-redo ${next ? '' : 'disabled'} title="${next ? `Wiederholen: ${esc(next.label)}` : 'Nichts zu wiederholen'} (Strg+Y)" aria-label="Wiederholen">↷</button>
+      <button class="btn grow" data-search>Suchen <span class="grow"></span><kbd>Strg K</kbd></button>
+      <button class="btn primary" data-new title="Neu (N)">+ Neu</button>
+    </div>
+    <div class="seg">${['raum', 'netz', 'zeit'].map((v) => `<button ${v === view ? 'class="on"' : ''} ${v !== 'netz' ? 'disabled title="Im Prototyp nur die Netz-Ansicht"' : ''}>${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div>
+    <div class="legend">${book.types.map((t) => `<button data-sel="relationType:${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}<button data-newtype title="Neue Beziehungsart">+</button></div>`
+}
+let sliding = false
+function renderTimebar() {
+  const t = book.tps[current], n = book.tps.length
+  $('#timebar').innerHTML = `
+    <div class="tb-head">
+      <button class="tp-name" data-sel="timePoint:${t.id}" title="Zeitpunkt bearbeiten">${current + 1}. ${esc(t.name)}</button>
+      ${t.date ? `<span class="date">${esc(t.date)}</span>` : ''}
+      <div class="seg" role="radiogroup" aria-label="Änderungen gelten">
+        <button data-scope="hier" class="${scope === 'hier' ? 'on' : ''}" title="Zeitliche Werte ändern sich ab dem aktuellen Zeitpunkt">Ab hier</button>
+        <button data-scope="ganz" class="${scope === 'ganz' ? 'on' : ''}" title="Zeitliche Werte ändern sich für die ganze Phase">Ganze Phase</button>
+      </div>
+    </div>
+    <div class="tb-row">
+      <button class="btn icon" data-step="-1" ${current === 0 ? 'disabled' : ''} aria-label="Vorheriger Zeitpunkt">‹</button>
+      <div class="slider" id="slider">${book.tps.map((tp, k) => `<div class="tk ${k === current ? 'on' : ''}" style="left:${n === 1 ? 50 : (k / (n - 1)) * 100}%"><i></i>${k + 1}</div>`).join('')}</div>
+      <button class="btn icon" data-step="1" ${current === n - 1 ? 'disabled' : ''} aria-label="Nächster Zeitpunkt">›</button>
+      <button class="btn icon" data-newtp title="Zeitpunkt nach diesem einfügen" aria-label="Zeitpunkt einfügen">+</button>
+    </div>`
+}
+function sliderAt(e) {
+  const r = $('#slider').getBoundingClientRect(), n = book.tps.length
+  return Math.max(0, Math.min(n - 1, Math.round(((e.clientX - r.left) / r.width) * (n - 1))))
+}
+$('#timebar').addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('#slider')) return
+  sliding = true; e.target.closest('#slider').setPointerCapture(e.pointerId); jump(sliderAt(e))
+})
+$('#timebar').addEventListener('pointermove', (e) => { if (sliding) { const k = sliderAt(e); if (k !== current) jump(k) } })
+$('#timebar').addEventListener('pointerup', () => { sliding = false })
+function jump(k) { current = Math.max(0, Math.min(book.tps.length - 1, k)); editing = null; render() }
+
+function renderTray() {
+  const i = current
+  const persons = book.persons.filter((p) => covers(book, p.exist, i) && !personPos(book, p.id, i))
+  const events = book.events.filter((e) => covers(book, e, i) && !e.place)
+  const tray = $('#tray')
+  tray.hidden = !persons.length && !events.length
+  tray.innerHTML = `<span>Ohne Ort auf ${i + 1}:</span>` +
+    persons.map((p) => `<span class="tray-chip ${fresh === p.id ? 'fresh' : ''}" data-tray="person:${p.id}" style="border-color:${p.color};color:${p.color}" title="Auf einen Ort ziehen">● ${esc(p.name)}</span>`).join('') +
+    events.map((e) => `<span class="tray-chip" data-tray="event:${e.id}" style="border-color:${e.color};color:${e.color}" title="Auf einen Ort ziehen">◆ ${esc(e.name)}</span>`).join('')
+}
+$('#tray').addEventListener('pointerdown', (e) => {
+  const chip = e.target.closest('[data-tray]'); if (!chip) return
+  const [kind, id] = chip.dataset.tray.split(':')
+  fresh = null
+  startDrag(e, kind, id, true)
+  drag.chip = { kind, id }
+})
+$('#tray').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-tray]'); if (!chip) return
+  const [kind, id] = chip.dataset.tray.split(':'); sel = { kind, id }; render()
+})
+
+// ---------- Darstellung: Panel ----------
+let reg = {}
+function F(key, value, commit, o = {}) {
+  reg[key] = { value: value ?? '', commit, o }
+  if (editing?.key === key) {
+    return o.multiline
+      ? `<textarea class="edit-input" data-input="${key}" rows="3" placeholder="${esc(o.placeholder ?? '')}">${esc(value)}</textarea><div class="edit-help">Markdown · <kbd>Strg Enter</kbd> übernehmen · <kbd>Esc</kbd> verwerfen</div>`
+      : `<input class="edit-input ${o.number ? 'num' : ''}" data-input="${key}" ${o.number ? 'type="number" step="0.1"' : ''} value="${esc(value)}" placeholder="${esc(o.placeholder ?? '')}">`
+  }
+  const empty = value === '' || value == null
+  const shown = empty ? esc(o.placeholder ?? 'leer') : o.multiline ? md(value) : esc(value)
+  return `<div class="field ${o.cls ?? ''} ${empty ? 'empty' : ''}" data-edit="${key}" tabindex="0" role="button" aria-label="${esc(o.label ?? 'Bearbeiten')}">${shown}</div>`
+}
+let ranges = {}
+function R(key, sp, commit) {
+  ranges[key] = { sp, commit }
+  const n = book.tps.length, pos = (k) => (n === 1 ? 50 : (k / (n - 1)) * 100)
+  return `<div class="range" data-range="${key}">
+    <div class="track">${book.tps.map((_, k) => `<span class="tick ${k === current ? 'now' : ''}" style="left:${pos(k)}%"></span>`).join('')}
+      <div class="fill" style="left:${pos(sp[0])}%;width:${pos(sp[1]) - pos(sp[0])}%"></div>
+      <button class="handle" data-h="0" style="left:${pos(sp[0])}%" aria-label="Beginn"></button>
+      <button class="handle" data-h="1" style="left:${pos(sp[1])}%" aria-label="Ende"></button></div>
+    <span class="range-text">${spanText(book, sp)}</span></div>`
+}
+const ref = (id) => `<button class="ref" data-sel="${find(book, id)?.kind}:${id}" style="color:${colorOf(book, id)}">${esc(nameOf(book, id))}</button>`
+const pick = (key, id, placeholder) => `<button class="pick" data-pick="${key}">${id ? `<span class="dot small" style="background:${colorOf(book, id)}"></span>${esc(nameOf(book, id))}` : `<span style="color:var(--dim)">${placeholder}</span>`}</button>`
+let picks = {}
+
+function renderPanel() {
+  reg = {}; ranges = {}; picks = {}
+  const panel = $('#panel')
+  if (!sel || (sel.kind !== 'book' && !find(book, sel.id))) { panel.hidden = true; return }
+  panel.hidden = false
+  const scroll = panel.scrollTop
+  panel.innerHTML = sel.kind === 'book' ? bookPanel() : elementPanel(find(book, sel.id))
+  panel.scrollTop = scroll
+  const input = editing && $(`[data-input="${CSS.escape(editing.key)}"]`)
+  if (input) {
+    input.focus()
+    if (editing.select) input.select(); else input.setSelectionRange?.(input.value.length, input.value.length)
+    if (input.tagName === 'TEXTAREA') autosize(input)
+  } else if (editing) editing = null
+}
+function autosize(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px' }
+
+function header(f) {
+  const { kind, e } = f
+  const name = F(`name:${e.id}`, e.name, (b, v) => { find(b, e.id).e.name = v || e.name }, { label: 'Name', placeholder: 'Name' })
+  return `<div class="panel-head">
+      ${e.color ? `<button class="dot" data-color="${e.id}" style="background:${e.color}" title="Farbe ändern" aria-label="Farbe ändern"></button>` : ''}
+      <div class="name">${name}</div>
+      <span class="badge">${KIND[kind]}</span>
+      <button class="x" data-close aria-label="Schließen">×</button></div>`
+}
+function elementPanel(f) {
+  const { kind, e } = f
+  let h = header(f)
+  if ('desc' in e) h += F(`desc:${e.id}`, e.desc, (b, v) => { find(b, e.id).e.desc = v }, { multiline: true, cls: 'desc', placeholder: 'Beschreibung hinzufügen …', label: 'Beschreibung' })
+  if (e.images?.length) h += `<img class="hero" src="${e.images[0].url}" alt="">`
+  if (kind === 'person' || kind === 'group') h += actorDetails(e, kind)
+  if (kind === 'place') h += placeDetails(e)
+  if (kind === 'event') h += eventDetails(e)
+  if (kind === 'timePoint') h += timePointDetails(e)
+  if (kind === 'relationType') h += typeDetails(e)
+  const own = hints(book).filter((x) => x.els.includes(e.id))
+  if (own.length) h += `<div class="sec"><div class="sec-title">Hinweise</div>${own.map((x) => `<button class="hint-row" data-hint="${esc(x.key)}"><span class="at">${x.at + 1}</span><span>${esc(x.text)}</span><span class="go">Lösen ›</span></button>`).join('')}</div>`
+  if (e.images) h += `<div class="sec"><div class="sec-title">Bilder</div>${e.images.length ? `<div class="thumbs">${e.images.map((im) => `<img src="${im.url}" alt="${esc(im.name)}" title="${esc(im.name)}">`).join('')}</div>` : ''}<div class="drop" data-drop="${e.id}">Bild ablegen, einfügen <kbd>Strg V</kbd> oder <u>auswählen</u></div></div>`
+  if ('note' in e) h += `<div class="sec"><div class="sec-title">Notiz</div>${F(`note:${e.id}`, e.note, (b, v) => { find(b, e.id).e.note = v }, { multiline: true, placeholder: 'Notiz hinzufügen …', label: 'Notiz' })}</div>`
+  h += `<div class="danger-zone"><button class="btn danger" data-del="${e.id}">Löschen <kbd>Entf</kbd></button></div>`
+  return h
+}
+function existRow(e) {
+  return `<div class="k">Existiert</div>${R(`exist:${e.id}`, span(book, e.exist), (b, sp) => setSpan(b, find(b, e.id).e.exist, sp))}`
+}
+function actorDetails(e, kind) {
+  const i = current
+  let h = `<div class="sec kv">${existRow(e)}</div>`
+  if (kind === 'person') {
+    const stay = stayAt(book, e.id, i)
+    const nowRel = book.relations.filter((r) => (r.a === e.id || r.b === e.id) && r.phases.some((p) => covers(book, p, i)))
+    const nowParts = book.parts.filter((p) => p.actor === e.id && covers(book, find(book, p.event).e, i))
+    const nowMem = book.members.filter((m) => m.person === e.id && covers(book, m, i))
+    h += `<div class="sec"><div class="sec-title">Stand: ${i + 1}. ${esc(book.tps[i].name)}<button class="link" data-add="${e.id}">+ Verknüpfung</button></div><div class="facts">`
+    h += stay ? stayRow(stay) : `<div class="empty-hint">Zu diesem Zeitpunkt nirgends. Aus der Leiste „Ohne Ort“ auf einen Ort ziehen oder ${pick(`stay-new:${e.id}`, null, 'Ort wählen')}</div>`
+    picks[`stay-new:${e.id}`] = { kind: 'place', onPick: (pid) => apply(`${e.name} nach ${nameOf(book, pid)}`, (b) => moveTo(b, e.id, pid, i)) }
+    h += nowRel.map((r) => relationRow(r, e.id)).join('') + nowMem.map(memberRow).join('') + nowParts.map((p) => partRow(p, 'event')).join('')
+    h += `</div></div>`
+    const items = [
+      ...book.stays.filter((s) => s.person === e.id).map((s) => ({ a: span(book, s)[0], sp: span(book, s), html: `in ${ref(s.place)}` })),
+      ...book.relations.filter((r) => r.a === e.id || r.b === e.id).flatMap((r) => r.phases.map((p) => { const t = book.types.find((x) => x.id === p.type); return { a: span(book, p)[0], sp: span(book, p), html: `${ref(r.a === e.id ? r.b : r.a)} <span class="tag" style="color:${t.color}">${esc(t.name)} · ${p.strength}</span>` } })),
+      ...book.parts.filter((p) => p.actor === e.id).map((p) => { const ev = find(book, p.event).e; return { a: span(book, ev)[0], sp: span(book, ev), html: `bei ${ref(ev.id)}` } }),
+    ].sort((x, y) => x.a - y.a)
+    h += `<div class="sec"><div class="sec-title">Verlauf</div><div class="history">${items.map((x) => `<div class="h ${x.sp[0] <= i && i <= x.sp[1] ? 'now' : ''}" data-jump="${x.a}"><span class="when">${spanText(book, x.sp)}</span>${x.html}</div>`).join('')}</div></div>`
+  } else {
+    const mem = book.members.filter((m) => m.group === e.id)
+    h += `<div class="sec"><div class="sec-title">Mitglieder<button class="link" data-addmember="${e.id}">+ Mitglied</button></div><div class="facts">${mem.map(memberRow).join('') || '<div class="empty-hint">Noch keine Mitglieder.</div>'}</div></div>`
+    picks[`member-new:${e.id}`] = { kind: 'person', onPick: (pid) => apply(`${nameOf(book, pid)} in ${e.name}`, (b) => { b.members.push({ id: nid('m'), person: pid, group: e.id, ...T() }) }) }
+  }
+  return h
+}
+function factRow(id, summary, when, body) {
+  const open = expanded.has(id)
+  return `<div class="fact ${open ? 'open' : ''}"><div class="fact-sum" data-toggle="${id}"><span class="chev">▶</span>${summary}<span class="when">${when}</span></div>${open ? `<div class="fact-body">${body}</div>` : ''}</div>`
+}
+function scopeNote(r) { return splits(r) ? `<div class="scope-note">Änderungen hier gelten ab ${current + 1}, davor bleibt es wie es war</div>` : '' }
+function delFact(label, list, id) { return `<div><button class="btn danger" data-delfact="${list}:${id}">${label} entfernen</button></div>` }
+function stayRow(s) {
+  picks[`stay:${s.id}`] = { kind: 'place', onPick: (pid) => apply(`Aufenthalt geändert`, (b) => { const own = b.stays.filter((x) => x.person === s.person); change(b, own, current, (x) => { x.place = pid }, b.stays) }) }
+  return factRow(s.id, `in ${ref(s.place)}`, spanText(book, span(book, s)),
+    `${scopeNote(s)}<div class="kv"><div class="k">Ort</div><div>${pick(`stay:${s.id}`, s.place)}</div><div class="k">Zeit</div>${R(`stay:${s.id}`, span(book, s), (b, sp) => setSpan(b, b.stays.find((x) => x.id === s.id), sp))}</div>${delFact('Aufenthalt', 'stays', s.id)}`)
+}
+function relationRow(r, me) {
+  const ph = r.phases.find((p) => covers(book, p, current))
+  const t = book.types.find((x) => x.id === ph.type)
+  const other = r.a === me ? r.b : r.a
+  const arrow = t.directed ? (r.a === me ? '→' : '←') : '↔'
+  picks[`type:${ph.id}`] = { kind: 'relationType', onPick: (tid) => apply('Beziehungsart geändert', (b) => { change(b, b.relations.find((x) => x.id === r.id).phases, current, (p) => { p.type = tid }) }) }
+  const strength = `<span class="strength" style="color:${t.color}">${[1, 2, 3, 4, 5].map((k) => `<button class="${k <= ph.strength ? 'on' : ''}" data-strength="${r.id}:${k}" aria-label="Stärke ${k}" title="Stärke ${k}"></button>`).join('')}</span>`
+  return factRow(ph.id, `${arrow} ${ref(other)} <span class="tag" style="color:${t.color}">${esc(t.name)} · ${ph.strength}</span>`, spanText(book, span(book, ph)),
+    `${scopeNote(ph)}<div class="kv"><div class="k">Art</div><div>${pick(`type:${ph.id}`, t.id)}</div><div class="k">Stärke</div><div>${strength}</div>
+     <div class="k">Diese Phase</div>${R(`rphase:${ph.id}`, span(book, ph), (b, sp) => setSpan(b, b.relations.find((x) => x.id === r.id).phases.find((p) => p.id === ph.id), sp))}
+     ${t.directed ? `<div class="k">Richtung</div><div><button class="btn" data-flip="${r.id}">⇄ umkehren</button></div>` : ''}</div>
+     <div class="row"><button class="btn danger" data-delphase="${r.id}:${ph.id}">Phase entfernen</button>${r.phases.length > 1 ? `<span style="color:var(--dim);font-size:12px">${r.phases.length} Phasen insgesamt</span>` : ''}</div>`)
+}
+function memberRow(m) {
+  return factRow(m.id, `${ref(m.person)} in ${ref(m.group)}`, spanText(book, span(book, m)),
+    `<div class="kv"><div class="k">Zeit</div>${R(`member:${m.id}`, span(book, m), (b, sp) => setSpan(b, b.members.find((x) => x.id === m.id), sp))}</div>${delFact('Mitgliedschaft', 'members', m.id)}`)
+}
+function partRow(p, show) {
+  return factRow(p.id, show === 'event' ? `bei ${ref(p.event)}` : ref(p.actor), spanText(book, span(book, find(book, p.event).e)), `<div style="color:var(--dim);font-size:13px">Gilt zur Zeit des Events.</div>${delFact('Teilnahme', 'parts', p.id)}`)
+}
+function placeDetails(p) {
+  const i = current, ph = p.phases.find((h) => covers(book, h, i))
+  const here = book.stays.filter((s) => s.place === p.id && covers(book, s, i))
+  let h = `<div class="sec kv">${existRow(p)}
+    <div class="k">Radius</div><div>${F(`radius:${p.id}`, p.r, (b, v) => { find(b, p.id).e.r = Math.max(0.5, Number(v) || p.r) }, { number: true, label: 'Radius' })}</div></div>`
+  if (ph) h += `<div class="sec"><div class="sec-title">Lage auf ${i + 1} · ${spanText(book, span(book, ph))}</div>${scopeNote(ph)}<div class="kv" style="margin-top:6px">
+      <div class="k">X</div><div>${F(`x:${p.id}`, ph.x, (b, v) => movePlace(b, p.id, i, Number(v), ph.y), { number: true, label: 'X' })}</div>
+      <div class="k">Y</div><div>${F(`y:${p.id}`, ph.y, (b, v) => movePlace(b, p.id, i, ph.x, Number(v)), { number: true, label: 'Y' })}</div></div>
+      <div class="edit-help">Oder den Ring in der Szene ziehen.</div></div>`
+  h += `<div class="sec"><div class="sec-title">Hier auf ${i + 1}</div><div class="chips">${here.map((s) => `<span class="chip">${ref(s.person)}</span>`).join('') || '<span style="color:var(--dim)">niemand</span>'}</div></div>`
+  if (p.phases.length > 1) h += `<div class="sec"><div class="sec-title">Phasen</div><div class="history">${p.phases.map((x) => `<div class="h ${x === ph ? 'now' : ''}" data-jump="${span(book, x)[0]}"><span class="when">${spanText(book, span(book, x))}</span>bei ${x.x} / ${x.y}</div>`).join('')}</div></div>`
+  return h
+}
+function eventDetails(e) {
+  const parts = book.parts.filter((p) => p.event === e.id)
+  picks[`evplace:${e.id}`] = { kind: 'place', clear: 'Ohne Ort', onPick: (pid) => apply('Ort des Events', (b) => { find(b, e.id).e.place = pid }) }
+  picks[`part-new:${e.id}`] = { kind: 'actor', onPick: (aid) => apply(`${nameOf(book, aid)} bei ${e.name}`, (b) => { b.parts.push({ id: nid('pa'), actor: aid, event: e.id }) }) }
+  return `<div class="sec kv"><div class="k">Zeit</div>${R(`ev:${e.id}`, span(book, e), (b, sp) => setSpan(b, find(b, e.id).e, sp))}
+    <div class="k">Ort</div><div>${pick(`evplace:${e.id}`, e.place, 'Ohne Ort')}</div></div>
+    <div class="sec"><div class="sec-title">Beteiligt<button class="link" data-pick="part-new:${e.id}">+ Beteiligte</button></div>
+      <div class="chips">${parts.map((p) => `<span class="chip">${ref(p.actor)}<button class="x" data-delfact="parts:${p.id}" aria-label="Entfernen">×</button></span>`).join('') || '<span style="color:var(--dim)">noch niemand</span>'}</div></div>
+    <div class="sec"><div class="sec-title">Ergebnis</div>${F(`result:${e.id}`, e.result, (b, v) => { find(b, e.id).e.result = v }, { multiline: true, placeholder: 'Was ändert sich dadurch?', label: 'Ergebnis' })}</div>`
+}
+function timePointDetails(t) {
+  const k = tIndex(book, t.id)
+  const bg = t.bg
+  return `<div class="sec kv"><div class="k">Datum</div><div>${F(`date:${t.id}`, t.date, (b, v) => { find(b, t.id).e.date = v }, { placeholder: 'z. B. Frühling, Jahr 412', label: 'Datum' })}</div>
+    <div class="k">Reihenfolge</div><div class="row"><button class="btn icon" data-movetp="-1" ${k === 0 ? 'disabled' : ''} aria-label="Früher">‹ früher</button><span style="color:var(--dim)">${k + 1} von ${book.tps.length}</span><button class="btn icon" data-movetp="1" ${k === book.tps.length - 1 ? 'disabled' : ''} aria-label="Später">später ›</button></div></div>
+    <div class="sec"><div class="sec-title">Hintergrund${bg ? '<button class="link" data-bgdel>entfernen</button>' : ''}</div>
+      ${bg ? `<div class="kv"><div class="k">X</div><div>${F(`bgx:${t.id}`, bg.x, (b, v) => { find(b, t.id).e.bg.x = Number(v) }, { number: true })}</div><div class="k">Y</div><div>${F(`bgy:${t.id}`, bg.y, (b, v) => { find(b, t.id).e.bg.y = Number(v) }, { number: true })}</div><div class="k">Breite</div><div>${F(`bgw:${t.id}`, bg.w, (b, v) => { find(b, t.id).e.bg.w = Math.max(1, Number(v)) }, { number: true })}</div></div>` : `<div class="drop" data-drop="bg:${t.id}">Karte oder Bild ablegen oder <u>auswählen</u><br><span style="font-size:12px">gilt bis zum nächsten Zeitpunkt mit eigenem Hintergrund</span></div>`}</div>`
+}
+function typeDetails(t) {
+  return `<div class="sec kv"><div class="k">Kategorie</div><div>${F(`cat:${t.id}`, t.category, (b, v) => { find(b, t.id).e.category = v }, { placeholder: 'z. B. Nähe' })}</div>
+    <div class="k">Gerichtet</div><div><button class="switch ${t.directed ? 'on' : ''}" data-directed="${t.id}" aria-label="Gerichtet" aria-pressed="${t.directed}"></button></div></div>`
+}
+function bookPanel() {
+  let h = `<div class="panel-head"><div class="name">${F('title', book.title, (b, v) => { b.title = v || book.title }, { label: 'Titel' })}</div><span class="badge">Buch</span><button class="x" data-close aria-label="Schließen">×</button></div>`
+  h += F('booknote', book.note, (b, v) => { b.note = v }, { multiline: true, cls: 'desc', placeholder: 'Notiz zum Buch …' })
+  h += `<div class="sec"><div class="sec-title">Zeitpunkte<button class="link" data-newtp>+ Zeitpunkt</button></div><div class="tplist">${book.tps.map((t, k) => `<div class="tprow" draggable="true" data-tp="${k}"><span class="grip" title="Ziehen zum Sortieren">⋮⋮</span><span style="color:var(--dim);width:18px">${k + 1}</span><button class="ref" data-sel="timePoint:${t.id}">${esc(t.name)}</button><span class="grow"></span><span style="color:var(--dim);font-size:12px">${esc(t.date)}</span></div>`).join('')}</div><div class="edit-help">Zum Umsortieren ziehen. Würde eine Zeitangabe dadurch rückwärts laufen, wird es verhindert.</div></div>`
+  h += `<div class="sec"><div class="sec-title">Beziehungsarten<button class="link" data-newtype>+ Art</button></div><div class="chips">${book.types.map((t) => `<button class="chip" data-sel="relationType:${t.id}" style="cursor:pointer;padding-right:8px"><span class="dot small" style="background:${t.color}"></span>${esc(t.name)}</button>`).join('')}</div></div>`
+  if (book.accepted.length) h += `<div class="sec"><div class="sec-title">Als gewollt markiert</div>${book.accepted.map((a) => `<div class="row" style="align-items:flex-start;margin-bottom:6px"><div class="grow" style="font-size:13px">${esc(a.text)}${a.note ? `<div style="color:var(--dim);font-style:italic">${esc(a.note)}</div>` : ''}</div><button class="link" data-unaccept="${esc(a.key)}">Wieder anzeigen</button></div>`).join('')}</div>`
+  h += `<div class="danger-zone"><button class="btn danger" data-reset>Beispielbuch zurücksetzen</button></div>`
+  return h
+}
+
+// ---------- Panel: Bedienung ----------
+const panel = $('#panel')
+panel.addEventListener('click', (e) => {
+  const t = e.target.closest('button, [data-edit], [data-toggle], [data-jump], [data-drop]')
+  if (!t) return
+  const d = t.dataset
+  if (d.edit) { editing = { key: d.edit }; renderPanel(); return }
+  if (d.hint) return openHint(d.hint)
+  if (d.unaccept) return apply('Hinweis wieder angezeigt', (b) => { b.accepted = b.accepted.filter((a) => a.key !== d.unaccept) })
+  if (d.toggle !== undefined && !e.target.closest('.ref')) { expanded.has(d.toggle) ? expanded.delete(d.toggle) : expanded.add(d.toggle); renderPanel(); return }
+  if (d.jump !== undefined && !e.target.closest('.ref')) return jump(Number(d.jump))
+  if (d.drop) return chooseFile(d.drop)
+  if (d.close !== undefined) { sel = null; render(); return }
+  if (d.del) return del(d.del)
+  if (d.color) return colorPop(t, d.color)
+  if (d.pick) return pickPop(t, d.pick)
+  if (d.add) return addMenu(t, d.add)
+  if (d.addmember) return pickPop(t, `member-new:${d.addmember}`)
+  if (d.strength) { const [rid, k] = d.strength.split(':'); return apply('Stärke geändert', (b) => change(b, b.relations.find((r) => r.id === rid).phases, current, (p) => { p.strength = Number(k) })) }
+  if (d.flip) return apply('Richtung umgekehrt', (b) => { const r = b.relations.find((x) => x.id === d.flip); [r.a, r.b] = [r.b, r.a] })
+  if (d.delphase) { const [rid, pid] = d.delphase.split(':'); return apply('Phase entfernt', (b) => { const r = b.relations.find((x) => x.id === rid); r.phases = r.phases.filter((p) => p.id !== pid); if (!r.phases.length) b.relations = b.relations.filter((x) => x !== r) }) && toast('Phase entfernt', { undo: true }) }
+  if (d.delfact) { const [list, id] = d.delfact.split(':'); return apply('Verknüpfung entfernt', (b) => { b[list] = b[list].filter((x) => x.id !== id) }) && toast('Verknüpfung entfernt', { undo: true }) }
+  if (d.directed) return apply('Richtung der Art', (b) => { const x = find(b, d.directed).e; x.directed = !x.directed })
+  if (d.movetp) return moveTimePoint(tIndex(book, sel.id), tIndex(book, sel.id) + Number(d.movetp))
+  if (d.bgdel !== undefined) return apply('Hintergrund entfernt', (b) => { delete find(b, sel.id).e.bg })
+  if (d.reset !== undefined) return modal('Beispielbuch zurücksetzen?', 'Alle Änderungen am Beispielbuch gehen verloren. Rückgängig bleibt bis zum Neuladen möglich.', [], 'Zurücksetzen', () => apply('Zurückgesetzt', (b) => { Object.assign(b, structuredClone(INITIAL)) }, () => { current = Math.min(current, book.tps.length - 1) }))
+})
+panel.addEventListener('keydown', (e) => {
+  const f = e.target.closest('[data-edit]')
+  if (f && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); editing = { key: f.dataset.edit }; renderPanel(); return }
+  const input = e.target.closest('[data-input]'); if (!input) return
+  const key = input.dataset.input, multi = input.tagName === 'TEXTAREA'
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); editing = null; renderPanel(); panel.querySelector(`[data-edit="${CSS.escape(key)}"]`)?.focus(); return }
+  if (e.key === 'Enter' && (!multi || e.ctrlKey || e.metaKey)) { e.preventDefault(); commitEdit(key, input.value); return }
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    const keys = Object.keys(reg), next = keys[keys.indexOf(key) + (e.shiftKey ? -1 : 1)]
+    commitEdit(key, input.value, next ? { key: next } : null)
+  }
+})
+panel.addEventListener('input', (e) => { if (e.target.tagName === 'TEXTAREA') autosize(e.target) })
+panel.addEventListener('focusout', (e) => {
+  const input = e.target.closest?.('[data-input]')
+  if (input && editing?.key === input.dataset.input) setTimeout(() => { if (editing?.key === input.dataset.input && !panel.contains(document.activeElement)) commitEdit(input.dataset.input, input.value) })
+})
+function commitEdit(key, raw, then = null) {
+  const r = reg[key]; editing = then
+  if (!r) return renderPanel()
+  const value = r.o.number ? raw : raw.trim()
+  if (String(value) === String(r.value) || (r.o.number && !Number.isFinite(Number(value)))) return render()
+  apply(`${r.o.label ?? 'Text'} geändert`, (b) => r.commit(b, value), () => { editing = then })
+}
+// Zeitspannen-Regler
+let rdrag = null
+panel.addEventListener('pointerdown', (e) => {
+  const box = e.target.closest('[data-range]'); if (!box) return
+  const key = box.dataset.range, track = $('.track', box), n = book.tps.length
+  const at = (ev) => { const r = track.getBoundingClientRect(); return Math.max(0, Math.min(n - 1, Math.round(((ev.clientX - r.left) / r.width) * (n - 1)))) }
+  const sp = [...ranges[key].sp]
+  let h = e.target.dataset.h
+  if (h === undefined) { const k = at(e); h = Math.abs(k - sp[0]) <= Math.abs(k - sp[1]) ? (k > sp[1] ? 1 : 0) : 1; sp[h] = k; if (sp[0] > sp[1]) sp[1 - h] = k }
+  rdrag = { key, box, sp, h: Number(h), at }
+  track.setPointerCapture(e.pointerId)
+  drawRange(rdrag)
+  e.preventDefault()
+})
+panel.addEventListener('pointermove', (e) => {
+  if (!rdrag) return
+  const k = rdrag.at(e), sp = rdrag.sp
+  sp[rdrag.h] = k
+  if (sp[0] > sp[1]) { sp.reverse(); rdrag.h = 1 - rdrag.h }
+  drawRange(rdrag)
+})
+panel.addEventListener('pointerup', () => { if (rdrag) { const d = rdrag; rdrag = null; commitRange(d.key, d.sp) } })
+panel.addEventListener('keydown', (e) => {
+  const handle = e.target.closest('.handle'); if (!handle || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return
+  e.preventDefault()
+  const key = handle.closest('[data-range]').dataset.range, sp = [...ranges[key].sp], h = Number(handle.dataset.h)
+  sp[h] = Math.max(0, Math.min(book.tps.length - 1, sp[h] + (e.key === 'ArrowLeft' ? -1 : 1)))
+  if (sp[0] > sp[1]) return
+  commitRange(key, sp, h)
+})
+function drawRange({ box, sp }) {
+  const n = book.tps.length, pos = (k) => (n === 1 ? 50 : (k / (n - 1)) * 100)
+  const [h0, h1] = box.querySelectorAll('.handle')
+  h0.style.left = pos(sp[0]) + '%'; h1.style.left = pos(sp[1]) + '%'
+  Object.assign($('.fill', box).style, { left: pos(sp[0]) + '%', width: pos(sp[1]) - pos(sp[0]) + '%' })
+  $('.range-text', box).textContent = spanText(book, sp)
+}
+function commitRange(key, sp, focusHandle) {
+  const r = ranges[key]
+  if (sp[0] === r.sp[0] && sp[1] === r.sp[1]) return
+  apply(`Zeit ${spanText(book, sp)}`, (b) => r.commit(b, sp))
+  if (focusHandle !== undefined) $(`[data-range="${CSS.escape(key)}"] .handle[data-h="${focusHandle}"]`)?.focus()
+}
+// Bilder
+function chooseFile(target) {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'
+  input.onchange = () => input.files[0] && addImage(target, input.files[0])
+  input.click()
+}
+function addImage(target, file) {
+  const reader = new FileReader()
+  reader.onload = () => {
+    const url = reader.result
+    if (target.startsWith('bg:')) apply('Hintergrund gesetzt', (b) => { find(b, target.slice(3)).e.bg = { url, x: 0, y: 0, w: 22 } })
+    else apply('Bild hinzugefügt', (b) => { find(b, target).e.images.push({ id: nid('img'), url, name: file.name }) })
+  }
+  reader.readAsDataURL(file)
+}
+panel.addEventListener('dragover', (e) => { const d = e.target.closest('[data-drop]'); if (d && e.dataTransfer.types.includes('Files')) { e.preventDefault(); d.classList.add('over') } })
+panel.addEventListener('dragleave', (e) => e.target.closest('[data-drop]')?.classList.remove('over'))
+panel.addEventListener('drop', (e) => { const d = e.target.closest('[data-drop]'); if (d && e.dataTransfer.files[0]) { e.preventDefault(); addImage(d.dataset.drop, e.dataTransfer.files[0]) } })
+addEventListener('paste', (e) => {
+  if (!sel || e.target.closest?.('input, textarea')) return
+  const file = [...e.clipboardData.files].find((f) => f.type.startsWith('image/'))
+  const f = find(book, sel.id)
+  if (file && f) addImage(f.kind === 'timePoint' ? `bg:${sel.id}` : sel.id, file)
+})
+// Zeitpunkte sortieren
+let tpFrom = null
+panel.addEventListener('dragstart', (e) => { const r = e.target.closest('[data-tp]'); if (r) { tpFrom = Number(r.dataset.tp); e.dataTransfer.effectAllowed = 'move' } })
+panel.addEventListener('dragover', (e) => { const r = e.target.closest('[data-tp]'); if (r && tpFrom !== null) { e.preventDefault(); panel.querySelectorAll('.tprow').forEach((x) => x.classList.toggle('over', x === r)) } })
+panel.addEventListener('drop', (e) => { const r = e.target.closest('[data-tp]'); if (r && tpFrom !== null) { e.preventDefault(); moveTimePoint(tpFrom, Number(r.dataset.tp)); tpFrom = null } })
+panel.addEventListener('dragend', () => { tpFrom = null; panel.querySelectorAll('.tprow').forEach((x) => x.classList.remove('over')) })
+function moveTimePoint(from, to) {
+  if (from === to || to < 0 || to >= book.tps.length) return render()
+  const id = book.tps[from].id, wasCurrent = book.tps[current].id
+  apply(`${book.tps[from].name} verschoben`, (b) => { const [t] = b.tps.splice(from, 1); b.tps.splice(to, 0, t) }, () => { current = tIndex(book, wasCurrent) })
+}
+
+// ---------- Popover, Menü, Suche, Dialog, Meldungen ----------
+let pop = null
+function closePop() { pop?.el.remove(); pop?.back?.remove(); pop = null }
+function openPop(x, y, o) {
+  closePop()
+  const el = document.createElement('div'); el.className = 'pop' + (o.search ? ' search' : '')
+  if (o.search) { const back = document.createElement('div'); back.className = 'backdrop'; back.onclick = closePop; document.body.append(back); pop = { back } }
+  el.innerHTML = `${o.title ? `<div class="title">${esc(o.title)}</div>` : ''}${o.noInput ? '' : `<input placeholder="${esc(o.placeholder ?? 'Suchen oder neu anlegen …')}" aria-label="Suchen">`}<div class="list"></div>`
+  document.body.append(el)
+  if (!o.search) { const r = el.getBoundingClientRect(); el.style.left = Math.min(x, innerWidth - r.width - 8) + 'px'; el.style.top = Math.min(y, innerHeight - r.height - 8) + 'px' }
+  pop = { ...(pop ?? {}), el, o, hl: 0 }
+  const input = $('input', el)
+  const draw = () => {
+    const q = input?.value.trim() ?? ''
+    const items = o.items.filter((it) => !q || it.label.toLowerCase().includes(q.toLowerCase()))
+    const exact = o.items.some((it) => it.label.toLowerCase() === q.toLowerCase())
+    const creates = q && !exact && o.createLabel ? (o.creates ?? [null]).map((kind) => ({ create: true, kind, label: o.createLabel(q, kind) })) : []
+    pop.view = [...items, ...creates]
+    pop.hl = Math.min(pop.hl, Math.max(0, pop.view.length - 1))
+    $('.list', el).innerHTML = pop.view.map((it, k) => `<button class="opt ${it.create ? 'create' : ''} ${k === pop.hl ? 'hl' : ''}" data-k="${k}">${it.create ? '+' : it.color ? `<span class="dot small" style="background:${it.color}"></span>` : ''}${esc(it.label)}${it.sub ? `<span class="sub">${esc(it.sub)}</span>` : ''}${it.key ? `<span class="sub"><kbd>${it.key}</kbd></span>` : ''}</button>`).join('') || '<div style="padding:8px;color:var(--dim)">Nichts gefunden</div>'
+  }
+  const choose = (it) => { if (!it) return; const q = input?.value.trim(); closePop(); it.create ? o.onCreate(q, it.kind) : o.onPick(it.id) }
+  el.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) choose(pop.view[Number(b.dataset.k)]) })
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); pop.hl = (pop.hl + (e.key === 'ArrowDown' ? 1 : -1) + pop.view.length) % Math.max(1, pop.view.length); draw() }
+    if (e.key === 'Enter') { e.preventDefault(); choose(pop.view[pop.hl]) }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePop() }
+    const it = o.noInput && pop.view.find((v) => v.key?.toLowerCase() === e.key.toLowerCase())
+    if (it) { e.preventDefault(); choose(it) }
+  })
+  input?.addEventListener('input', () => { pop.hl = 0; draw() })
+  draw()
+  ;(input ?? $('.opt', el))?.focus()
+}
+addEventListener('pointerdown', (e) => { if (pop && !pop.o.search && !pop.el.contains(e.target)) closePop() }, true)
+function itemsOf(kind) {
+  const list = kind === 'actor' ? actors(book) : kind === 'place' ? book.places : kind === 'person' ? book.persons : kind === 'relationType' ? book.types : []
+  return list.map((x) => ({ id: x.id, label: x.name, color: x.color }))
+}
+function pickPop(anchor, key) {
+  const p = picks[key]; const r = anchor.getBoundingClientRect()
+  const createKind = p.kind === 'actor' ? 'person' : p.kind
+  openPop(r.left, r.bottom + 4, {
+    items: [...(p.clear ? [{ id: null, label: p.clear }] : []), ...itemsOf(p.kind)],
+    createLabel: p.kind === 'relationType' ? null : (q) => `„${q}“ als ${KIND[createKind]} anlegen`,
+    onPick: p.onPick,
+    onCreate: (q) => { const keep = sel; const id = create(createKind, q); if (id) { sel = keep; editing = null; p.onPick(id) } },
+  })
+}
+function addMenu(anchor, pid) {
+  const r = anchor.getBoundingClientRect()
+  openPop(r.left - 60, r.bottom + 4, {
+    title: 'Neue Verknüpfung ab ' + (current + 1), noInput: true,
+    items: [{ id: 'stay', label: 'Aufenthalt', sub: 'Ort' }, { id: 'rel', label: 'Beziehung', sub: 'Person' }, { id: 'part', label: 'Teilnahme', sub: 'Event' }, { id: 'mem', label: 'Mitgliedschaft', sub: 'Gruppe' }],
+    onPick: (what) => {
+      const me = nameOf(book, pid)
+      const list = what === 'stay' ? book.places : what === 'rel' ? actors(book).filter((a) => a.id !== pid) : what === 'part' ? book.events : book.groups
+      openPop(r.left - 60, r.bottom + 4, {
+        title: { stay: 'Aufenthalt in …', rel: 'Beziehung zu …', part: 'Teilnahme an …', mem: 'Mitglied in …' }[what],
+        items: list.map((x) => ({ id: x.id, label: x.name, color: x.color })),
+        createLabel: (q) => `„${q}“ neu anlegen`,
+        onCreate: (q) => { const kind = { stay: 'place', rel: 'person', part: 'event', mem: 'group' }[what]; const id = create(kind, q); sel = { kind: 'person', id: pid }; editing = null; if (id) link(what, pid, id, r) },
+        onPick: (id) => link(what, pid, id, r),
+      })
+      function link(w, a, id) {
+        if (w === 'stay') apply(`${me} nach ${nameOf(book, id)}`, (b) => moveTo(b, a, id, current))
+        if (w === 'part') apply(`${me} bei ${nameOf(book, id)}`, (b) => { b.parts.push({ id: nid('pa'), actor: a, event: id }) })
+        if (w === 'mem') apply(`${me} in ${nameOf(book, id)}`, (b) => { const m = { id: nid('m'), person: a, group: id, from: null, to: null }; setSpan(b, m, [current, b.tps.length - 1]); b.members.push(m) })
+        if (w === 'rel') typeMenu(r.left - 60, r.bottom + 4, a, id)
+      }
+    },
+  })
+}
+function newMenu(anchor) {
+  const r = anchor ? anchor.getBoundingClientRect() : { left: 24, bottom: 160 }
+  openPop(r.left, r.bottom + 4, {
+    title: 'Neu', noInput: true,
+    items: [['person', 'Person', 'P'], ['group', 'Gruppe', 'G'], ['place', 'Ort', 'O'], ['event', 'Event', 'E'], ['timePoint', 'Zeitpunkt nach diesem', 'Z']].map(([id, label, key]) => ({ id, label, key })),
+    onPick: (kind) => create(kind),
+  })
+}
+function search() {
+  const items = [
+    ...lists(book).filter(([k]) => k !== 'relationType').flatMap(([kind, l]) => l.map((x, k) => ({ id: `${kind}:${x.id}`, label: kind === 'timePoint' ? `${k + 1}. ${x.name}` : x.name, color: x.color, sub: KIND[kind] }))),
+    ...book.types.map((t) => ({ id: `relationType:${t.id}`, label: t.name, color: t.color, sub: 'Beziehungsart' })),
+  ]
+  openPop(0, 0, {
+    search: true, items, placeholder: 'Person, Gruppe, Ort, Event oder Zeitpunkt … oder neu anlegen',
+    creates: ['person', 'place', 'event', 'group'], createLabel: (q, kind) => `„${q}“ als ${KIND[kind]} anlegen`,
+    onPick: (v) => { const [kind, id] = v.split(':'); sel = { kind, id }; if (kind === 'timePoint') current = tIndex(book, id); if (kind === 'event') current = span(book, find(book, id).e)[0]; render() },
+    onCreate: (q, kind) => create(kind, q),
+  })
+}
+function colorPop(anchor, id) {
+  const r = anchor.getBoundingClientRect(), cur = colorOf(book, id)
+  closePop()
+  const el = document.createElement('div'); el.className = 'pop'
+  el.innerHTML = `<div class="title">Farbe</div><div class="swatches">${PALETTE.map((c) => `<button data-c="${c}" class="${c === cur ? 'on' : ''}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div><input value="${cur}" aria-label="Hex-Farbe" style="margin-top:4px">`
+  el.style.left = r.left + 'px'; el.style.top = r.bottom + 6 + 'px'
+  document.body.append(el); pop = { el, o: {} }
+  const set = (c) => { closePop(); if (/^#[0-9a-f]{6}$/i.test(c) && c !== cur) apply('Farbe geändert', (b) => { find(b, id).e.color = c.toLowerCase() }) }
+  el.addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) set(b.dataset.c) })
+  $('input', el).addEventListener('keydown', (e) => { if (e.key === 'Enter') set(e.target.value.trim()); if (e.key === 'Escape') closePop() })
+  $('button', el).focus()
+}
+function modal(title, text, list, confirm, onConfirm) {
+  closePop()
+  const back = document.createElement('div'); back.className = 'backdrop'
+  const el = document.createElement('div'); el.className = 'modal'; el.setAttribute('role', 'dialog')
+  el.innerHTML = `<h3>${esc(title)}</h3><div style="color:var(--dim)">${esc(text)}</div>${list.length ? `<ul>${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<div style="height:16px"></div>'}<div class="actions"><button class="btn" data-no>Abbrechen <kbd>Esc</kbd></button><button class="btn primary" data-yes style="background:#e03131;border-color:#e03131">${esc(confirm)} <kbd style="color:#fff;background:#fff2;border-color:#fff4">Enter</kbd></button></div>`
+  document.body.append(back, el)
+  const close = () => { back.remove(); el.remove(); removeEventListener('keydown', key, true) }
+  const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close() } if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(); onConfirm() } }
+  addEventListener('keydown', key, true)
+  back.onclick = close; $('[data-no]', el).onclick = close; $('[data-yes]', el).onclick = () => { close(); onConfirm() }
+  $('[data-yes]', el).focus()
+}
+function toast(text, o = {}) {
+  const el = document.createElement('div'); el.className = 'toast' + (o.error ? ' error' : '')
+  el.innerHTML = `<span>${esc(text)}</span>${o.undo ? '<button class="link" data-u>Rückgängig</button>' : ''}`
+  $('#toasts').append(el)
+  if (o.undo) $('[data-u]', el).onclick = () => { el.remove(); undo() }
+  setTimeout(() => el.remove(), o.error ? 5000 : 4000)
+  while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove()
+}
+
+// ---------- Hinweis-Dialog ----------
+let hd = null
+function openHint(target) {
+  closePop()
+  const list = hints(book)
+  hd = { i: typeof target === 'number' ? target : Math.max(0, list.findIndex((h) => h.key === target)), accepting: false }
+  showHint()
+}
+function showHint() {
+  const h = hints(book)[hd.i]
+  if (h) { current = h.at; sel = { kind: find(book, h.els[0]).kind, id: h.els[0] }; editing = null }
+  hd.accepting = false
+  render()
+}
+function renderHintDlg() {
+  const el = $('#hintdlg')
+  if ($('#help')) $('#help').hidden = !!hd
+  if (!hd) { el.hidden = true; return }
+  el.hidden = false
+  const list = hints(book), h = list[hd.i]
+  if (!h) {
+    el.innerHTML = list.length
+      ? `<div class="done"><div>Ende erreicht, ${list.length} Hinweise übersprungen</div><div class="row" style="justify-content:center;margin-top:10px"><button class="btn" data-hd="close">Schließen</button><button class="btn primary" data-hd="restart">Von vorn</button></div></div>`
+      : `<div class="done"><div class="big">✓</div><div>Alle Hinweise erledigt</div><div class="row" style="justify-content:center;margin-top:10px"><button class="btn" data-hd="close">Schließen <kbd>Esc</kbd></button></div></div>`
+    return
+  }
+  const { list: fx, rows, bad } = fixes(book, h)
+  const n = book.tps.length, L = (k) => (k / n) * 100
+  const mini = rows.map((r) => `<div class="lbl" title="${esc(r.label)}">${esc(r.label)}</div><div class="trk" style="--n:${n}"><div class="bar" style="left:${L(r.sp[0])}%;width:${L(r.sp[1] + 1) - L(r.sp[0])}%;background:${r.color}"></div>${bad[0] <= bad[1] ? `<div class="bad" style="left:${L(bad[0])}%;width:${L(bad[1] + 1) - L(bad[0])}%"></div>` : ''}</div>`).join('')
+  const nums = `<div></div><div class="nums">${book.tps.map((_, k) => `<span class="${k === h.at ? 'now' : ''}">${k + 1}</span>`).join('')}</div>`
+  el.innerHTML = `
+    <div class="head"><span class="badge">Hinweis ${hd.i + 1} von ${list.length}</span><span class="grow"></span><button class="x" data-hd="close" aria-label="Schließen" title="Schließen (Esc)">×</button></div>
+    <div class="text">${esc(h.text)}</div>
+    <div class="els">${h.els.map(ref).join('')}</div>
+    <div class="mini">${mini}${nums}</div>
+    <div class="fixes">${fx.map((f, k) => `<button class="fix" data-fix="${k}"><kbd>${k + 1}</kbd><div><b>${esc(f.label)}</b><div class="pv">→ ${esc(f.preview)}</div></div></button>`).join('')}</div>
+    ${hd.accepting ? `<div class="accept"><input data-acceptnote placeholder="Begründung (optional), Enter markiert"><button class="btn primary" data-hd="accept-ok">Markieren</button></div>` : ''}
+    <div class="foot"><button class="link" data-hd="self">Selbst bearbeiten</button><button class="link" data-hd="accept">Als gewollt markieren <kbd>G</kbd></button><span class="grow"></span><button class="btn" data-hd="skip">Überspringen <kbd>S</kbd></button></div>`
+  if (hd.accepting) $('[data-acceptnote]', el).focus()
+}
+function hintAction(what, k) {
+  const h = hints(book)[hd.i]
+  if (what === 'close') { hd = null; render(); return }
+  if (what === 'restart') { hd.i = 0; return showHint() }
+  if (!h) return
+  if (what === 'fix') {
+    const f = fixes(book, h).list[k]; if (!f) return
+    if (apply(`Hinweis gelöst: ${f.label}`, f.op)) toast(`Gelöst: ${f.label}`, { undo: true })
+    return showHint()
+  }
+  if (what === 'skip') { hd.i++; return showHint() }
+  if (what === 'self') { hd = null; expanded.add(h.ids[0]); render(); return }
+  if (what === 'accept') { hd.accepting = true; return renderHintDlg() }
+  if (what === 'accept-ok') {
+    const note = $('[data-acceptnote]')?.value.trim() ?? ''
+    if (apply('Als gewollt markiert', (b) => { b.accepted.push({ key: h.key, rule: h.rule, ids: h.ids, note, text: h.text }) })) toast('Als gewollt markiert', { undo: true })
+    showHint()
+  }
+}
+$('#hintdlg').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-hd], [data-fix]'); if (!t) return
+  if (t.dataset.fix !== undefined) hintAction('fix', Number(t.dataset.fix)); else hintAction(t.dataset.hd)
+})
+$('#hintdlg').addEventListener('keydown', (e) => {
+  if (!e.target.matches('[data-acceptnote]')) return
+  e.stopPropagation()
+  if (e.key === 'Enter') hintAction('accept-ok')
+  if (e.key === 'Escape') { hd.accepting = false; renderHintDlg() }
+})
+
+// ---------- Globale Bedienung ----------
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button'); if (!t || panel.contains(t) && !t.dataset.sel) return
+  const d = t.dataset
+  if (d.sel) { const [kind, id] = d.sel.split(':'); sel = { kind, id }; editing = null; if (kind === 'timePoint') current = tIndex(book, id); closePop(); render(); return }
+  if (d.open === 'book') { sel = { kind: 'book' }; render() }
+  if (d.undo !== undefined) undo()
+  if (d.redo !== undefined) redoStep()
+  if (d.search !== undefined) search()
+  if (d.new !== undefined) newMenu(t)
+  if (d.newtp !== undefined) create('timePoint')
+  if (d.newtype !== undefined) { let id; apply('Beziehungsart angelegt', (b) => { id = nid('rt'); b.types.push({ id, name: 'Neue Art', color: nextColor(b), directed: false, category: '' }) }, () => { sel = { kind: 'relationType', id }; editing = { key: `name:${id}`, select: true } }) }
+  if (d.scope) { scope = d.scope; render() }
+  if (d.step) jump(current + Number(d.step))
+  if (d.hints !== undefined) openHint(0)
+})
+$('#help-x').onclick = () => $('#help').remove()
+addEventListener('keydown', (e) => {
+  if (document.querySelector('.modal')) return
+  const typing = e.target.closest?.('input, textarea')
+  const mod = e.ctrlKey || e.metaKey
+  if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); search(); return }
+  if (typing || pop) return
+  if (hd && !mod) {
+    const k = e.key.toLowerCase()
+    if (['1', '2', '3'].includes(k)) { e.preventDefault(); return hintAction('fix', Number(k) - 1) }
+    if (k === 's') { e.preventDefault(); return hintAction('skip') }
+    if (k === 'g') { e.preventDefault(); return hintAction('accept') }
+    if (k === 'escape') { e.preventDefault(); return hintAction('close') }
+  }
+  if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+  else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoStep() }
+  else if (mod) return
+  else if (e.key === '/') { e.preventDefault(); search() }
+  else if (e.key.toLowerCase() === 'n') { e.preventDefault(); newMenu($('[data-new]')) }
+  else if (e.key === 'F2' && sel) { e.preventDefault(); editing = { key: sel.kind === 'book' ? 'title' : `name:${sel.id}`, select: true }; renderPanel() }
+  else if (e.key === 'Delete' && sel && sel.kind !== 'book') { e.preventDefault(); del(sel.id) }
+  else if (e.key === 'ArrowLeft' && !e.target.closest('.handle')) jump(current - 1)
+  else if (e.key === 'ArrowRight' && !e.target.closest('.handle')) jump(current + 1)
+  else if (e.key === 'Escape') { sel = null; editing = null; render() }
+})
+
+function render() {
+  renderToolbar(); renderScene(); renderPanel(); renderTray(); renderHintDlg()
+  if (!sliding) renderTimebar()
+  else { $('.tp-name').textContent = `${current + 1}. ${book.tps[current].name}`; document.querySelectorAll('#slider .tk').forEach((t, k) => t.classList.toggle('on', k === current)) }
+}
+render()
+</script>
+</body>
+</html>

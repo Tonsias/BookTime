@@ -10,6 +10,7 @@ vi.mock('./store', () => {
       get: async (repo: string) => data.get(repo),
       put: async (copy: WorkingCopy) => void data.set(copy.repo, structuredClone(copy)),
     },
+    imageCache: { get: async (_repo: string, sha: string) => (sha === 'fehlt' ? undefined : new Blob([`bild ${sha}`])) },
   }
 })
 
@@ -63,14 +64,16 @@ class FakeGitHub {
     if (commit) return [200, { tree: { sha: this.commits.get(commit)!.tree } }]
     if (route === '/git/trees') {
       const files = { ...this.trees.get(body.base_tree as string) }
-      for (const entry of body.tree as { path: string; content?: string; sha?: null }[]) {
-        if (entry.content === undefined) delete files[entry.path]
+      for (const entry of body.tree as { path: string; content?: string; sha?: string | null }[]) {
+        if (entry.sha) files[entry.path] = `blob:${entry.sha}`
+        else if (entry.content === undefined) delete files[entry.path]
         else files[entry.path] = entry.content
       }
       const sha = this.id('tree')
       this.trees.set(sha, files)
       return [201, { sha }]
     }
+    if (route === '/git/blobs') return [201, { sha: `hochgeladen-${atob(body.content as string)}` }]
     if (route === '/git/commits') {
       const sha = this.id('commit')
       this.commits.set(sha, { tree: body.tree as string, parents: body.parents as string[] })
@@ -164,6 +167,22 @@ describe('GitHub-Abläufe', () => {
     expect(copy.branch).toBe('tester/arbeit')
     expect(github.refs.has(fallback)).toBe(false)
     expect(github.refs.get('tester/arbeit')).toBe(github.refs.get('main'))
+  })
+
+  it('lädt neue Bilder als Blobs hoch und löscht entfernte', async () => {
+    let copy = await load('token', 'o/buch')
+    copy = await commitLocal({ ...copy, imageChanges: { 'images/karte-kkkk.png': { sha: 'k1', size: 5 } } }, 'Karte')
+    expect(copy.imageChanges).toEqual({})
+    copy = await push('token', copy)
+    expect(github.files(copy.head)['images/karte-kkkk.png']).toBe('blob:hochgeladen-bild k1')
+    expect(copy.images['images/karte-kkkk.png']).toEqual({ sha: 'k1', size: 5 })
+    copy = await push('token', await commitLocal({ ...copy, imageChanges: { 'images/karte-kkkk.png': null } }, 'Weg'))
+    expect(github.files(copy.head)['images/karte-kkkk.png']).toBeUndefined()
+  })
+
+  it('meldet ein Bild, das im Browser-Speicher fehlt', async () => {
+    const copy = await commitLocal({ ...(await load('token', 'o/buch')), imageChanges: { 'images/x-xxxx.png': { sha: 'fehlt', size: 1 } } }, 'Bild')
+    await expect(push('token', copy)).rejects.toThrow('fehlt im Browser-Speicher')
   })
 
   it('schließt einen abgebrochenen Push nur noch ab', async () => {

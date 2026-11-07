@@ -30,6 +30,7 @@ export interface Image {
   note?: string
 }
 
+/** Gemeinsame Felder von Person, Gruppe, Ort und Event */
 interface Element {
   id: string
   description: string
@@ -38,13 +39,16 @@ interface Element {
   note?: string
 }
 
-interface Named extends Element {
+/** Element mit Namen und Lebenszeit */
+export interface Named extends Element {
   name: string
   existence: Timing
 }
 
+/** Person, verortet über Aufenthalte und Reisen */
 type Person = Named
 
+/** Gruppe aus Personen über Mitgliedschaften */
 type Group = Named
 
 /** Lage eines Ortes während einer Zeitspanne, x/y relativ zum Elternort */
@@ -72,7 +76,8 @@ export interface StoryEvent extends Element {
   result: string
 }
 
-interface RelationType {
+/** Art einer Beziehung, gerichtet oder ungerichtet */
+export interface RelationType {
   id: string
   name: string
   category: string
@@ -109,12 +114,14 @@ export interface Relation {
   note?: string
 }
 
-interface Stay extends TimedFact {
+/** Person hält sich an einem Ort auf */
+export interface Stay extends TimedFact {
   kind: 'stay'
   person: string
   place: string
 }
 
+/** Person reist zwischen zwei Orten */
 interface Journey extends TimedFact {
   kind: 'journey'
   person: string
@@ -131,6 +138,7 @@ interface Participation extends Omit<TimedFact, 'timing'> {
   timing?: Timing
 }
 
+/** Person gehört zu einer Gruppe */
 interface Membership extends TimedFact {
   kind: 'membership'
   person: string
@@ -141,10 +149,18 @@ interface Membership extends TimedFact {
 /** Zeitlich begrenzte Aussage, die Elemente verbindet */
 export type Fact = Relation | Stay | Journey | Participation | Membership
 
+/** Hinweis, den die Autoren als gewollt markiert haben; erkannt über Regel und beteiligte IDs */
+export interface AcceptedHint {
+  rule: string
+  ids: string[]
+  note?: string
+}
+
 /** Ein ganzes Buch */
 export interface Book {
   title: string
   note?: string
+  acceptedHints: AcceptedHint[]
   timePoints: TimePoint[]
   persons: Person[]
   groups: Group[]
@@ -194,6 +210,34 @@ export function factTiming(book: Book, fact: Fact): Timing {
   const spans = fact.phases.map((p) => bounds(book, p.timing))
   const points = timeline(book)
   return { from: points[Math.min(...spans.map((s) => s[0]))]?.id, to: points[Math.max(...spans.map((s) => s[1]))]?.id }
+}
+
+/** Kurztext einer Spanne von Indizes: immer, nur 3, ab 3, bis 3, 2–5 */
+export function spanLabel(book: Book, [a, z]: [number, number]) {
+  const last = book.timePoints.length - 1
+  if (a <= 0 && z >= last) return 'immer'
+  if (a === z) return `nur ${a + 1}`
+  if (a <= 0) return `bis ${z + 1}`
+  return z >= last ? `ab ${a + 1}` : `${a + 1}–${z + 1}`
+}
+
+/** Lesbare Bezeichnung eines Fakts, bei Beziehungen einer ihrer Phasen */
+export function factLabel(book: Book, fact: Fact, phase?: RelationPhase): string {
+  const n = (id: string) => findElement(book, id)?.label ?? id
+  switch (fact.kind) {
+    case 'stay':
+      return `Aufenthalt von ${n(fact.person)} in ${n(fact.place)}`
+    case 'journey':
+      return `Reise von ${n(fact.person)} nach ${n(fact.destination)}`
+    case 'participation':
+      return `Teilnahme von ${n(fact.actor)} an „${n(fact.event)}“`
+    case 'membership':
+      return `Mitgliedschaft von ${n(fact.person)} in ${n(fact.group)}`
+    case 'relation': {
+      const type = book.relationTypes.find((t) => t.id === phase?.type)
+      return `Beziehung ${n(fact.from)} – ${n(fact.to)}${type ? ` (${type.name})` : ''}`
+    }
+  }
 }
 
 /** Die zum Index i gültige Phase */

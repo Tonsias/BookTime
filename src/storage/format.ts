@@ -1,5 +1,5 @@
 import { problems } from '../checks'
-import type { Book, Fact } from '../model'
+import type { AcceptedHint, Book, Fact } from '../model'
 
 /** Dateiinhalte eines Buchs, Pfad relativ zum Repo-Wurzelordner */
 export type BookFiles = Record<string, string>
@@ -137,6 +137,7 @@ const orderTiming = (t: unknown) => {
 export function bookToFiles(book: Book): BookFiles {
   const files: BookFiles = { 'booktime.json': json({ format: FORMAT, title: book.title }) }
   if (book.note) files['booktime.note.md'] = book.note + '\n'
+  if (book.acceptedHints.length) files[ACCEPTED] = json({ accepted: book.acceptedHints.map(({ rule, ids, note }) => (note ? { rule, ids, note } : { rule, ids })) })
   const labels = new Map<string, string>()
   for (const list of [book.timePoints, book.persons, book.groups, book.places, book.relationTypes]) list.forEach((e) => labels.set(e.id, e.name))
   book.events.forEach((e) => labels.set(e.id, e.title))
@@ -304,7 +305,32 @@ export function filesToBook(files: BookFiles, others: string[] = []): { book: Bo
     changed = next.length !== valid.length
     valid = next
   }
-  return { book: assemble(meta, files, valid), errors }
+  const book = assemble(meta, files, valid)
+  book.acceptedHints = readAccepted(files[ACCEPTED], new Set(valid.flatMap((p) => nestedIds(p.item))), errors)
+  return { book, errors }
+}
+
+const ACCEPTED = 'accepted-hints.json'
+
+// Einträge mit unbekannten IDs fallen still weg, nach dem Löschen eines Elements wäre ein Ladefehler nur lästig
+function readAccepted(text: string | undefined, known: Set<unknown>, errors: LoadError[]): AcceptedHint[] {
+  if (text === undefined) return []
+  let list: unknown
+  try {
+    list = (JSON.parse(text) as { accepted?: unknown }).accepted
+  } catch {
+    errors.push({ path: ACCEPTED, reason: 'kein gültiges JSON' })
+    return []
+  }
+  if (!Array.isArray(list)) {
+    errors.push({ path: ACCEPTED, reason: 'accepted ist keine Liste' })
+    return []
+  }
+  return list.flatMap((entry: Partial<AcceptedHint> | null) => {
+    const { rule, ids, note } = entry ?? {}
+    const valid = typeof rule === 'string' && Array.isArray(ids) && ids.every((id) => typeof id === 'string' && known.has(id)) && (note === undefined || typeof note === 'string')
+    return valid ? [note ? { rule, ids, note } : { rule, ids }] : []
+  })
 }
 
 function unknownFile(path: string, files: BookFiles, fail: (reason: string) => void) {
@@ -322,7 +348,7 @@ function unknownFile(path: string, files: BookFiles, fail: (reason: string) => v
 }
 
 function assemble(meta: Record<string, unknown>, files: BookFiles, valid: Parsed[]): Book {
-  const book: Book = { title: typeof meta.title === 'string' ? meta.title : 'Ohne Titel', timePoints: [], persons: [], groups: [], places: [], events: [], relationTypes: [], facts: [] }
+  const book: Book = { title: typeof meta.title === 'string' ? meta.title : 'Ohne Titel', acceptedHints: [], timePoints: [], persons: [], groups: [], places: [], events: [], relationTypes: [], facts: [] }
   const markdown = (path: string) => files[path]?.replace(/\n$/, '')
   if (files['booktime.note.md']) book.note = markdown('booktime.note.md')
   for (const { kind, path, item: parsed } of valid) {
@@ -338,8 +364,11 @@ function assemble(meta: Record<string, unknown>, files: BookFiles, valid: Parsed
   return book
 }
 
+/** Pfad einer neuen Bilddatei nach dem Schema images/<name>-<id>.<endung> */
+export const imagePath = (name: string, id: string, extension: string) => `images/${slug(name)}-${id}.${extension.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'}`
+
 /** Zufällige ID aus 4 Zeichen, die in `taken` noch nicht vorkommt */
-function newId(taken: Set<string>) {
+export function newId(taken: Set<string>) {
   for (;;) {
     const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => (b % 36).toString(36)).join('')
     if (!taken.has(id)) return id

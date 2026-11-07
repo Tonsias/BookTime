@@ -104,6 +104,14 @@ export class GitHub {
     return new Blob([Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0))])
   }
 
+  /** Lädt eine Binärdatei als Blob hoch und liefert ihren SHA */
+  async createBlob(data: Blob) {
+    const bytes = new Uint8Array(await data.arrayBuffer())
+    let binary = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+    return (await this.request<{ sha: string }>('/{repo}/git/blobs', { method: 'POST', body: { content: btoa(binary), encoding: 'base64' } })).sha
+  }
+
   /** Neuer Commit aus Änderungen gegenüber dem Eltern-Commit; null löscht eine Datei */
   async commit(parent: string, message: string, changes: Record<string, { content: string } | { sha: string } | null>) {
     const { tree } = await this.request<{ tree: { sha: string } }>(`/{repo}/git/commits/${parent}`)

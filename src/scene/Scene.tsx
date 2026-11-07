@@ -1,12 +1,13 @@
 import { Component, memo, Suspense, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react'
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Edges, Line, useTexture } from '@react-three/drei'
-import { BufferGeometry, ConeGeometry, DoubleSide, OctahedronGeometry, Plane, Quaternion, RingGeometry, SphereGeometry, SRGBColorSpace, Vector3 } from 'three'
+import { BufferGeometry, ConeGeometry, DoubleSide, OctahedronGeometry, Plane, Quaternion, Raycaster, RingGeometry, SphereGeometry, SRGBColorSpace, Vector2, Vector3 } from 'three'
 import { backgroundAt, covers, elementColor, factsAt, phaseAt, type Book, type TimePoint } from '../model'
 import type { Selection, View } from '../ui/types'
 import { Labels, type Label } from './Labels'
 import { LAYER_SIZE, SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
 import { Markers, type Marker } from './Markers'
+import type { Projector } from './Gestures'
 import { Segments, type Segment } from './Segments'
 
 interface SceneProps {
@@ -20,6 +21,7 @@ interface SceneProps {
   focus: Set<string> | null
   onSelect: (selection: Selection | null) => void
   onJump: (index: number) => void
+  onProjector: (projector: Projector | null) => void
 }
 
 const noRaycast = () => null
@@ -50,7 +52,7 @@ const geometryFor = (shape: string) => {
 
 /** 3D-Raum-Zeit-Würfel: Ebenen je Zeitpunkt, Personen als Stränge, Orte als Ringe, Beziehungen als Kanten, Events als Marker */
 export function Scene(props: SceneProps) {
-  const { book, imageUrl, points, layout, current, view, selection, focus, onSelect, onJump } = props
+  const { book, imageUrl, points, layout, current, view, selection, focus, onSelect, onJump, onProjector } = props
   const selectedId = selection?.id ?? null
   const count = points.length
   const color = (id: string) => elementColor(book, id)
@@ -111,6 +113,7 @@ export function Scene(props: SceneProps) {
       <ambientLight intensity={0.6} />
       <directionalLight position={[-10, 20, 15]} intensity={1.2} />
       <CameraRig view={view} current={current} count={count} />
+      <ProjectorBridge onReady={onProjector} />
       <TimeClip enabled={view === 'netz'} x={current * SLICE_SPACING} />
 
       {visible.map((i) => (
@@ -229,6 +232,34 @@ function CameraRig({ view, current, count }: { view: View; current: number; coun
   }, [view, follow, mid])
 
   return <CameraControls ref={ref} makeDefault />
+}
+
+const raycaster = new Raycaster()
+const ndc = new Vector2()
+const hit = new Vector3()
+
+/** Stellt der Oberfläche die Umrechnung Bildschirm ↔ Netz einer Ebene bereit */
+function ProjectorBridge({ onReady }: { onReady: (projector: Projector | null) => void }) {
+  const camera = useThree((s) => s.camera)
+  const gl = useThree((s) => s.gl)
+  useEffect(() => {
+    onReady({
+      toNet: (clientX, clientY, slice) => {
+        const rect = gl.domElement.getBoundingClientRect()
+        ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1)
+        raycaster.setFromCamera(ndc, camera)
+        const point = raycaster.ray.intersectPlane(new Plane(new Vector3(1, 0, 0), -slice * SLICE_SPACING), hit)
+        return point ? [point.z, point.y] : null
+      },
+      toScreen: (slice, pos) => {
+        const rect = gl.domElement.getBoundingClientRect()
+        const p = slicePoint(slice, pos).project(camera)
+        return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height }
+      },
+    })
+    return () => onReady(null)
+  }, [camera, gl, onReady])
+  return null
 }
 
 /** Schneidet in der Netz-Ansicht alles vor der aktuellen Ebene weg */

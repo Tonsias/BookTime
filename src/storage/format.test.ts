@@ -76,3 +76,27 @@ describe('Ladefehler', () => {
     expect(() => load({ 'booktime.json': json({ format: 99, title: 'Neu' }) })).toThrow(FormatTooNewError)
   })
 })
+
+describe('Gewollte Hinweise', () => {
+  const accepted = (list: unknown) => ({ 'accepted-hints.json': json({ accepted: list }) })
+
+  it('liest und schreibt die Datei, ohne Notiz ohne Feld', () => {
+    const entries = [{ rule: 'outside-existence', ids: ['eeee', 'dddd'], note: 'gewollt' }, { rule: 'clash', ids: ['eeee'] }]
+    const { book, errors } = load(accepted(entries))
+    expect(errors).toEqual([])
+    expect(book.acceptedHints).toEqual(entries)
+    expect(bookToFiles(book)['accepted-hints.json']).toBe(json({ accepted: entries }))
+  })
+
+  it('lässt Einträge mit unbekannten IDs still weg', () => {
+    const { book, errors } = load(accepted([{ rule: 'clash', ids: ['eeee', 'zzzz'] }]))
+    expect(errors).toEqual([])
+    expect(book.acceptedHints).toEqual([])
+    expect(bookToFiles(book)['accepted-hints.json']).toBeUndefined()
+  })
+
+  it('meldet eine kaputte Datei, ohne das Buch zu blockieren', () => {
+    expect(reasons({ 'accepted-hints.json': '{' })).toEqual(['accepted-hints.json: kein gültiges JSON'])
+    expect(reasons({ 'accepted-hints.json': json({ accepted: 1 }) })).toEqual(['accepted-hints.json: accepted ist keine Liste'])
+  })
+})

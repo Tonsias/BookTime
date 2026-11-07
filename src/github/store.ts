@@ -1,9 +1,16 @@
 import type { BookFiles } from '../storage/format'
 
+/** Bilddatei: Git-Blob-SHA und Größe in Bytes */
+export interface ImageRef {
+  sha: string
+  size: number
+}
+
 /** Lokaler Commit, der noch nicht gepusht ist; null löscht eine Datei */
 interface LocalCommit {
   message: string
   changes: Record<string, string | null>
+  images?: Record<string, ImageRef | null>
 }
 
 /** Arbeitskopie eines Buch-Repos im Browser */
@@ -15,7 +22,9 @@ export interface WorkingCopy {
   /** Commit auf GitHub, auf dem die Arbeitskopie aufsetzt */
   head: string
   base: BookFiles
-  images: Record<string, { sha: string; size: number }>
+  images: Record<string, ImageRef>
+  /** Neue (Blob im imageCache) und gelöschte (null) Bilder seit dem letzten lokalen Commit */
+  imageChanges?: Record<string, ImageRef | null>
   files: BookFiles
   commits: LocalCommit[]
   repoSize: number

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hints, problems } from './checks'
+import { hintKey, hints, openHints, problems } from './checks'
 import type { Book } from './model'
 
 const point = (id: string, order: number) => ({ id, name: id, order })
@@ -7,6 +7,7 @@ const place = (id: string, extra: object = {}) => ({ id, name: id, color: '#0000
 
 const base = (extra: Partial<Book> = {}): Book => ({
   title: 'Test',
+  acceptedHints: [],
   timePoints: [point('t1', 1), point('t2', 2), point('t3', 3)],
   persons: [{ id: 'p', name: 'Pia', color: '#000000', description: '', existence: {}, images: [] }],
   groups: [],
@@ -45,7 +46,7 @@ describe('Hinweise', () => {
         { kind: 'stay', id: 's2', person: 'p', place: 'b', timing: { at: 't2' } },
       ],
     })
-    expect(hints(book)).toEqual([{ ids: ['p'], at: 1, text: 'Pia ist gleichzeitig an mehreren Orten oder unterwegs' }])
+    expect(hints(book)).toEqual([{ rule: 'clash', ids: ['s1', 's2'], els: ['p'], at: 1, text: 'Pia ist gleichzeitig in a und in b (nur 2)' }])
   })
 
   it('lässt Aufenthalt und Reise am Grenzpunkt zu', () => {
@@ -67,7 +68,7 @@ describe('Hinweise', () => {
         { kind: 'participation', id: 'x', actor: 'p', event: 'e' },
       ],
     })
-    expect(hints(book).map((h) => h.text)).toEqual(['Pia ist bei „Fest“, aber woanders'])
+    expect(hints(book).map((h) => [h.rule, h.ids, h.text])).toEqual([['elsewhere', ['x'], 'Pia ist bei „Fest“ (1), aber in a']])
   })
 
   it('erkennt einen Fakt außerhalb der Existenz', () => {
@@ -75,7 +76,7 @@ describe('Hinweise', () => {
       persons: [{ id: 'p', name: 'Pia', color: '#000000', description: '', existence: { to: 't1' }, images: [] }],
       facts: [{ kind: 'stay', id: 's', person: 'p', place: 'a', timing: { at: 't2' } }],
     })
-    expect(hints(book).map((h) => [h.at, h.text])).toEqual([[1, 'Fakt liegt außerhalb der Existenz von Pia']])
+    expect(hints(book).map((h) => [h.at, h.text])).toEqual([[1, 'Aufenthalt von Pia in a (nur 2) liegt außerhalb der Existenz von Pia (nur 1)']])
   })
 
   it('erkennt überlappende gleiche ungerichtete Beziehungen in beide Richtungen', () => {
@@ -84,7 +85,7 @@ describe('Hinweise', () => {
       persons: [...base().persons, { id: 'q', name: 'Quinn', color: '#000000', description: '', existence: {}, images: [] }],
       facts: [relation('r1', 'p', 'q'), relation('r2', 'q', 'p')],
     })
-    expect(hints(book).map((h) => h.text)).toEqual(['Zwei gleiche ungerichtete Beziehungen überschneiden sich'])
+    expect(hints(book).map((h) => [h.ids, h.text])).toEqual([[['r1-1', 'r2-1'], 'Zwei Beziehungen „Freunde“ zwischen Pia und Quinn überschneiden sich (immer)']])
   })
 
   it('meldet Bilder und Hintergründe, die im Repo fehlen', () => {
@@ -98,6 +99,22 @@ describe('Hinweise', () => {
 
   it('erkennt Lücken in den Orts-Phasen', () => {
     const phases = [{ id: 'x', timing: { at: 't1' }, x: 0, y: 0, images: [] }]
-    expect(hints(base({ places: [place('a', { phases })] })).map((h) => [h.at, h.text])).toEqual([[1, 'a hat zu dieser Zeit keine Lage']])
+    expect(hints(base({ places: [place('a', { phases })] })).map((h) => [h.at, h.text])).toEqual([[1, 'a hat ab 2 keine Lage']])
+  })
+})
+
+describe('Gewollte Hinweise', () => {
+  const book = base({
+    persons: [{ id: 'p', name: 'Pia', color: '#000000', description: '', existence: { to: 't1' }, images: [] }],
+    facts: [{ kind: 'stay', id: 's', person: 'p', place: 'a', timing: {} }],
+  })
+
+  it('erkennt einen Hinweis über Regel und IDs', () => {
+    expect(hints(book).map(hintKey)).toEqual(['outside-existence:s,p'])
+  })
+
+  it('blendet als gewollt markierte Hinweise aus', () => {
+    expect(openHints(book)).toHaveLength(1)
+    expect(openHints({ ...book, acceptedHints: [{ rule: 'outside-existence', ids: ['s', 'p'] }] })).toEqual([])
   })
 })
