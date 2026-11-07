@@ -50,6 +50,9 @@ const geometryFor = (shape: string) => {
   return geometry
 }
 
+// Im Software-WebGL der Tests meldet Chromium beim Auflösen der Kantenglättung selten „Blit feedback loop“
+const GL = { antialias: import.meta.env.MODE !== 'e2e' }
+
 /** 3D-Raum-Zeit-Würfel: Ebenen je Zeitpunkt, Personen als Stränge, Orte als Ringe, Beziehungen als Kanten, Events als Marker */
 export function Scene(props: SceneProps) {
   const { book, imageUrl, points, layout, current, view, selection, focus, onSelect, onJump, onProjector } = props
@@ -105,7 +108,7 @@ export function Scene(props: SceneProps) {
   }
 
   return (
-    <Canvas camera={{ position: [-20, 14, 30], fov: 45 }} onPointerMissed={(e) => {
+    <Canvas gl={GL} camera={{ position: [-20, 14, 30], fov: 45 }} onPointerMissed={(e) => {
         // Klicks auf HTML-Labels landen auch hier – nur echte Klicks ins Leere heben die Auswahl auf
         if ((e.target as HTMLElement).tagName === 'CANVAS') onSelect(null)
       }}>
