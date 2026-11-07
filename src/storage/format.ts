@@ -1,5 +1,6 @@
+import { NO_CALENDAR } from '../calendar'
 import { problems } from '../checks'
-import type { AcceptedHint, Book, Fact } from '../model'
+import type { AcceptedHint, Book, Calendar, Fact } from '../model'
 
 /** Dateiinhalte eines Buchs, Pfad relativ zum Repo-Wurzelordner */
 export type BookFiles = Record<string, string>
@@ -14,7 +15,7 @@ export interface LoadError {
 export const FORMAT = 1
 
 type RefKind = 'timePoint' | 'person' | 'group' | 'actor' | 'place' | 'event' | 'relationType'
-type Scalar = 'id' | 'string' | 'number' | 'positive' | 'boolean' | 'color' | 'timing' | 'strength' | RefKind
+type Scalar = 'id' | 'string' | 'number' | 'integer' | 'count' | 'positive' | 'boolean' | 'color' | 'timing' | 'strength' | RefKind
 interface Spec {
   [key: string]: Scalar | `${Scalar}?` | [Spec] | Spec
 }
@@ -22,9 +23,10 @@ interface Spec {
 const IMAGE: Spec = { id: 'id', file: 'string', order: 'number', timing: 'timing?', note: 'string?' }
 const NAMED: Spec = { id: 'id', name: 'string', color: 'color', existence: 'timing', images: [IMAGE] }
 const TIMED: Spec = { timing: 'timing', causedBy: 'event?' }
+const DATE: Spec = { era: 'integer?', year: 'integer', month: 'count?', day: 'count?' }
 
 interface Kind {
-  key: keyof Omit<Book, 'title' | 'note' | 'facts'> | Fact['kind']
+  key: keyof Omit<Book, 'title' | 'note' | 'calendar' | 'facts'> | Fact['kind']
   folder: string
   spec: Spec
   texts: string[]
@@ -35,11 +37,11 @@ const KINDS: Kind[] = [
   {
     key: 'timePoints',
     folder: 'time-points',
-    spec: { id: 'id', name: 'string', dateLabel: 'string?', order: 'number', background: { id: 'id', file: 'string', x: 'number', y: 'number', width: 'positive', note: 'string?' } },
+    spec: { id: 'id', name: 'string', dateLabel: 'string?', date: DATE, order: 'number', background: { id: 'id', file: 'string', x: 'number', y: 'number', width: 'positive', note: 'string?' } },
     texts: ['note'],
     names: ['name'],
   },
-  { key: 'persons', folder: 'persons', spec: NAMED, texts: ['description', 'note'], names: ['name'] },
+  { key: 'persons', folder: 'persons', spec: { id: 'id', name: 'string', born: DATE, color: 'color', existence: 'timing', images: [IMAGE] }, texts: ['description', 'note'], names: ['name'] },
   { key: 'groups', folder: 'groups', spec: NAMED, texts: ['description', 'note'], names: ['name'] },
   {
     key: 'places',
@@ -137,6 +139,7 @@ const orderTiming = (t: unknown) => {
 export function bookToFiles(book: Book): BookFiles {
   const files: BookFiles = { 'booktime.json': json({ format: FORMAT, title: book.title }) }
   if (book.note) files['booktime.note.md'] = book.note + '\n'
+  if (book.calendar) files[CALENDAR] = json(calendarJson(book.calendar))
   if (book.acceptedHints.length) files[ACCEPTED] = json({ accepted: book.acceptedHints.map(({ rule, ids, note }) => (note ? { rule, ids, note } : { rule, ids })) })
   const labels = new Map<string, string>()
   for (const list of [book.timePoints, book.persons, book.groups, book.places, book.relationTypes]) list.forEach((e) => labels.set(e.id, e.name))
@@ -174,6 +177,9 @@ function check(value: unknown, field: Spec[string], where: string, refs: Ref[]):
   switch (type) {
     case 'number':
       return typeof value === 'number' && Number.isFinite(value) ? undefined : `${where} ist keine Zahl`
+    case 'integer':
+    case 'count':
+      return Number.isInteger(value) && (type === 'integer' || (value as number) >= 1) ? undefined : `${where} ist keine ganze Zahl${type === 'count' ? ' ab 1' : ''}`
     case 'positive':
       return typeof value === 'number' && value > 0 && Number.isFinite(value) ? undefined : `${where} ist keine Zahl größer 0`
     case 'boolean':
@@ -255,6 +261,7 @@ export function filesToBook(files: BookFiles, others: string[] = []): { book: Bo
   }
   if (typeof meta.format === 'number' && meta.format > FORMAT) throw new FormatTooNewError(`Das Buch hat Format ${meta.format}, diese BookTime-Version kennt nur bis ${FORMAT}.`)
 
+  const calendar = readCalendar(files[CALENDAR], errors)
   const parsed: Parsed[] = []
   for (const path of [...Object.keys(files), ...others].sort()) {
     const fail = (reason: string) => errors.push({ path, reason })
@@ -295,7 +302,7 @@ export function filesToBook(files: BookFiles, others: string[] = []): { book: Bo
       return !missing
     })
     if (next.length === valid.length) {
-      const failed = new Map(problems(assemble(meta, files, next)).map((p) => [p.id, p.reason]))
+      const failed = new Map(problems(assemble(meta, files, next, calendar)).map((p) => [p.id, p.reason]))
       next = next.filter((p) => {
         const reason = failed.get(p.item.id as string)
         if (reason) errors.push({ path: p.path, reason })
@@ -305,12 +312,52 @@ export function filesToBook(files: BookFiles, others: string[] = []): { book: Bo
     changed = next.length !== valid.length
     valid = next
   }
-  const book = assemble(meta, files, valid)
+  const book = assemble(meta, files, valid, calendar)
   book.acceptedHints = readAccepted(files[ACCEPTED], new Set(valid.flatMap((p) => nestedIds(p.item))), errors)
   return { book, errors }
 }
 
 const ACCEPTED = 'accepted-hints.json'
+const CALENDAR = 'calendar.json'
+
+const calendarJson = ({ months, weekdays, firstWeekday, before, eras }: Calendar) => ({
+  ...(months.length && { months: months.map(({ name, days }) => ({ name, days })) }),
+  ...(weekdays.length && { weekdays, firstWeekday }),
+  ...(eras.length && { before: { name: before.name, short: before.short }, eras: eras.map(({ name, short, years }) => (years ? { name, short, years } : { name, short })) }),
+})
+
+const NAME: Spec = { name: 'string', short: 'string' }
+
+function calendarError(value: unknown) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'kein Objekt'
+  const { weekdays, ...rest } = { months: [], weekdays: [], eras: [], ...value } as Record<string, unknown>
+  const error = checkObject(rest, { months: [{ name: 'string', days: 'count' }], firstWeekday: 'integer?', before: NAME, eras: [{ ...NAME, years: 'count?' }] }, '', [])
+  if (error) return error
+  if (!Array.isArray(weekdays) || weekdays.some((w) => typeof w !== 'string')) return 'weekdays ist keine Liste von Texten'
+  const { firstWeekday = 0, before, eras } = rest as Partial<Calendar>
+  if (firstWeekday < 0 || firstWeekday >= Math.max(1, weekdays.length)) return 'firstWeekday ist kein Wochentag'
+  if (eras!.length && !before) return 'before fehlt'
+  if (eras!.some((e, i) => (i < eras!.length - 1) !== (e.years !== undefined))) return 'Nur die letzte Zeitrechnung ist ohne Länge'
+}
+
+/** Liest calendar.json; ein falscher Aufbau ist ein Ladefehler, das Buch hat dann keinen Kalender */
+function readCalendar(text: string | undefined, errors: LoadError[]): Calendar | undefined {
+  if (text === undefined) return undefined
+  let value: Record<string, unknown>
+  try {
+    value = JSON.parse(text)
+  } catch {
+    errors.push({ path: CALENDAR, reason: 'kein gültiges JSON' })
+    return undefined
+  }
+  const error = calendarError(value)
+  if (error) {
+    errors.push({ path: CALENDAR, reason: error })
+    return undefined
+  }
+  const calendar = { ...NO_CALENDAR, ...(value as Partial<Calendar>) }
+  return calendar.months.length || calendar.weekdays.length || calendar.eras.length ? calendar : undefined
+}
 
 // Einträge mit unbekannten IDs fallen still weg, nach dem Löschen eines Elements wäre ein Ladefehler nur lästig
 function readAccepted(text: string | undefined, known: Set<unknown>, errors: LoadError[]): AcceptedHint[] {
@@ -347,8 +394,8 @@ function unknownFile(path: string, files: BookFiles, fail: (reason: string) => v
   else if (files[`${text[1]}.json`] === undefined) fail('Text ohne zugehörige JSON-Datei')
 }
 
-function assemble(meta: Record<string, unknown>, files: BookFiles, valid: Parsed[]): Book {
-  const book: Book = { title: typeof meta.title === 'string' ? meta.title : 'Ohne Titel', acceptedHints: [], timePoints: [], persons: [], groups: [], places: [], events: [], relationTypes: [], facts: [] }
+function assemble(meta: Record<string, unknown>, files: BookFiles, valid: Parsed[], calendar: Calendar | undefined): Book {
+  const book: Book = { title: typeof meta.title === 'string' ? meta.title : 'Ohne Titel', ...(calendar && { calendar }), acceptedHints: [], timePoints: [], persons: [], groups: [], places: [], events: [], relationTypes: [], facts: [] }
   const markdown = (path: string) => files[path]?.replace(/\n$/, '')
   if (files['booktime.note.md']) book.note = markdown('booktime.note.md')
   for (const { kind, path, item: parsed } of valid) {

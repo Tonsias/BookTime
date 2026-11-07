@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Anchor, Badge, Button, Code, Container, Group, Modal, Paper, PasswordInput, Stack, Table, Text, TextInput, Textarea, Title } from '@mantine/core'
 import { filesToBook, FormatTooNewError } from '../storage/format'
+import { parseAddress, splitAddress } from './address'
 import { GitHub } from './api'
 import { activeRepo, books, copies, token, type WorkingCopy } from './store'
 import { changes as pending, commitLocal, currentImages, load, openPull, push, unpushedImageSize } from './sync'
-
-const REPO = /^[\w.-]+\/[\w.-]+$/
 
 const size = (kb: number) => (kb < 1024 ? `${kb} KB` : `${(kb / 1024).toFixed(1)} MB`)
 
@@ -183,17 +182,26 @@ function TokenSection({ token: value, login, onChange }: { token: string | null;
   )
 }
 
-function AddBook({ onAdd }: { onAdd: (repo: string) => void }) {
+function AddBook({ onAdd }: { onAdd: (address: string) => void }) {
   const [input, setInput] = useState('')
-  const repo = input.trim().replace(/^https:\/\/github\.com\//, '')
+  const parsed = parseAddress(input)
   return (
-    <Group align="end" mt="sm">
-      <TextInput flex={1} label="Buch-Repo hinzufügen" placeholder="owner/repo" value={input} onChange={(e) => setInput(e.currentTarget.value)} />
+    <Group align="start" mt="sm">
+      <TextInput
+        flex={1}
+        label="Buch hinzufügen"
+        placeholder="owner/repo oder owner/repo/ordner"
+        value={input}
+        error={'error' in parsed && parsed.error}
+        onChange={(e) => setInput(e.currentTarget.value)}
+      />
       <Button
         variant="default"
-        disabled={!REPO.test(repo)}
+        mt={24}
+        disabled={!('address' in parsed)}
         onClick={() => {
-          onAdd(repo)
+          if (!('address' in parsed)) return
+          onAdd(parsed.address)
           setInput('')
         }}
       >
@@ -237,7 +245,8 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }
     )
 
   const { errors, changes } = checked
-  const fileUrl = (path: string) => `https://github.com/${repo}/blob/${encodeURIComponent(copy.branch).replaceAll('%2F', '/')}/${path}`
+  const where = splitAddress(repo)
+  const fileUrl = (path: string) => `https://github.com/${where.repo}/blob/${encodeURIComponent(copy.branch).replaceAll('%2F', '/')}/${where.path ? `${where.path}/` : ''}${path}`
   return (
     <Section title={repo}>
       <Stack gap="md">

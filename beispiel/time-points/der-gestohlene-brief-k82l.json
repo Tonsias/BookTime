@@ -1,5 +1,11 @@
 {
   "id": "k82l",
   "name": "Der gestohlene Brief",
+  "date": {
+    "era": 2,
+    "year": 412,
+    "month": 2,
+    "day": 20
+  },
   "order": 2
 }

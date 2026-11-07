@@ -1,10 +1,11 @@
 import { hintKey } from '../../checks'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Anchor, Box, Button, Group, Image as Picture, Kbd, Text } from '@mantine/core'
-import { byId, setText } from '../../edit/ops'
-import { elementColor, findElement } from '../../model'
+import { Anchor, Box, Button, Group, Image as Picture, Kbd, NativeSelect, Stack, Text, TextInput } from '@mantine/core'
+import { calendarOf } from '../../calendar'
+import { byId, dateOf, setDate, setText } from '../../edit/ops'
+import { elementColor, findElement, type BookDate } from '../../model'
 import { useUi } from '../context'
-import { Inline, Markdown } from '../fields'
+import { DateText, Inline, Markdown } from '../fields'
 
 /** Abschnitt im Panel mit Überschrift und optionaler Aktion rechts */
 export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
@@ -185,5 +186,62 @@ export function NoteSection({ id, note }: { id: string; note?: string }) {
     <Section title="Notiz">
       <TextField id={id} field="note" value={note} label="Notiz" multiline optional />
     </Section>
+  )
+}
+
+const tidyDate = ({ era, year, month, day }: BookDate): BookDate => ({ ...(era !== undefined && { era }), year, ...(month && { month }), ...(month && day && { day }) })
+
+/** Datum mit Zeitrechnung, Jahr, Monat und Tag; Monat erst mit Jahr, Tag erst mit Monat (Festlegung 25 des Kalenders) */
+export function DateField({ id, label }: { id: string; label: string }) {
+  const { book, change } = useUi()
+  const cal = calendarOf(book)
+  const date = dateOf(book, id)
+  const set = (next: BookDate | undefined) => change(`${label} geändert`, (d) => setDate(d, id, next && tidyDate(next)))
+  const era = date?.era ?? (cal.eras.length ? cal.eras.length : undefined)
+  const month = cal.months[(date?.month ?? 1) - 1]
+  return (
+    <Stack gap={4}>
+      <Group gap={4} wrap="nowrap">
+        {cal.eras.length > 0 && (
+          <NativeSelect size="xs" flex={1} aria-label="Zeitrechnung" value={String(era)} data={[cal.before.name, ...cal.eras.map((e) => e.name)].map((name, k) => ({ value: String(k), label: name }))} onChange={(e) => date && set({ ...date, era: Number(e.currentTarget.value) })} />
+        )}
+        <DateNumber label="Jahr" value={date?.year} min={cal.eras.length ? 1 : undefined} width={64} onCommit={(year) => set(year === undefined ? undefined : { ...date, era, year })} />
+      </Group>
+      {cal.months.length > 0 && (
+        <Group gap={4} wrap="nowrap">
+          <NativeSelect size="xs" flex={1} aria-label="Monat" disabled={!date} value={String(date?.month ?? '')} data={[{ value: '', label: 'Monat –' }, ...cal.months.map((m, k) => ({ value: String(k + 1), label: m.name }))]} onChange={(e) => date && set({ ...date, month: Number(e.currentTarget.value) || undefined, day: e.currentTarget.value ? date.day : undefined })} />
+          <DateNumber label="Tag" value={date?.day} min={1} max={month?.days} width={64} disabled={!date?.month} onCommit={(day) => date && set({ ...date, day })} />
+        </Group>
+      )}
+      {date && <DateText cal={cal} date={date} />}
+    </Stack>
+  )
+}
+
+function DateNumber(props: { label: string; value?: number; min?: number; max?: number; width: number; disabled?: boolean; onCommit: (value: number | undefined) => void }) {
+  const { label, value, min, max, width, disabled, onCommit } = props
+  const [text, setDraft] = useState<string>()
+  const commit = () => {
+    if (text === undefined) return
+    setDraft(undefined)
+    const n = text.trim() === '' ? undefined : Math.round(Number(text))
+    if (n !== value && (n === undefined || Number.isFinite(n))) onCommit(n === undefined ? undefined : Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n)))
+  }
+  return (
+    <TextInput
+      size="xs"
+      w={width}
+      aria-label={label}
+      placeholder={label}
+      inputMode="numeric"
+      disabled={disabled}
+      value={text ?? (value === undefined ? '' : String(value))}
+      onChange={(e) => setDraft(e.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') setDraft(undefined)
+      }}
+    />
   )
 }

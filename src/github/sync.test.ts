@@ -31,6 +31,28 @@ class FakeGitHub {
     this.commits.set(sha, { tree, parents })
     return sha
   }
+  // Unterordner als eigene Bäume: Commit oder Unterbaum plus Präfix
+  subtrees = new Map<string, { of: string; prefix: string }>()
+  view(id: string) {
+    const sub = this.subtrees.get(id)
+    return { files: this.files(sub?.of ?? id), prefix: sub?.prefix ?? '' }
+  }
+  blobs(id: string) {
+    const { files, prefix } = this.view(id)
+    return Object.entries(files)
+      .filter(([p]) => p.startsWith(prefix))
+      .map(([p, text]) => ({ path: p.slice(prefix.length), type: 'blob', sha: `blob-${p}`, size: text.length }))
+  }
+  entries(id: string) {
+    const { prefix } = this.view(id)
+    const names = new Set(this.blobs(id).map((b) => b.path.split('/')[0]! + (b.path.includes('/') ? '/' : '')))
+    return [...names].map((name) => {
+      if (!name.endsWith('/')) return { path: name, type: 'blob', sha: `blob-${prefix}${name}`, size: 0 }
+      const sha = this.id('sub')
+      this.subtrees.set(sha, { of: this.subtrees.get(id)?.of ?? id, prefix: prefix + name })
+      return { path: name.slice(0, -1), type: 'tree', sha, size: 0 }
+    })
+  }
   ancestors(sha: string): string[] {
     return [sha, ...(this.commits.get(sha)?.parents ?? []).flatMap((p) => this.ancestors(p))]
   }
@@ -58,8 +80,8 @@ class FakeGitHub {
       this.refs.set((body.ref as string).replace('refs/heads/', ''), body.sha as string)
       return [201, {}]
     }
-    const tree = /^\/git\/trees\/(\w+)\?recursive=1$/.exec(route)?.[1]
-    if (tree) return [200, { tree: Object.entries(this.files(tree)).map(([p, text]) => ({ path: p, type: 'blob', sha: `blob-${p}`, size: text.length })) }]
+    const [, tree, recursive] = /^\/git\/trees\/(\w+)(\?recursive=1)?$/.exec(route) ?? []
+    if (tree) return [200, { tree: recursive ? this.blobs(tree) : this.entries(tree) }]
     const commit = /^\/git\/commits\/(\w+)$/.exec(route)?.[1]
     if (commit) return [200, { tree: { sha: this.commits.get(commit)!.tree } }]
     if (route === '/git/trees') {
@@ -183,6 +205,32 @@ describe('GitHub-Abläufe', () => {
   it('meldet ein Bild, das im Browser-Speicher fehlt', async () => {
     const copy = await commitLocal({ ...(await load('token', 'o/buch')), imageChanges: { 'images/x-xxxx.png': { sha: 'fehlt', size: 1 } } }, 'Bild')
     await expect(push('token', copy)).rejects.toThrow('fehlt im Browser-Speicher')
+  })
+
+  describe('Buch in einem Unterordner', () => {
+    const code = { 'README.md': '# Projekt\n', 'src/app.json': '{}\n' }
+    beforeEach(() => void github.refs.set('main', github.addCommit(code, [])))
+
+    it('richtet einen leeren Ordner auf dem Standardbranch ein und lädt nur das Buch', async () => {
+      const copy = await load('token', 'o/buch/docs/story')
+      expect(Object.keys(copy.base).sort()).toEqual(['booktime.json', expect.stringMatching(/^time-points\/anfang-\w{4}\.json$/)])
+      expect(filesToBook(copy.base).book.title).toBe('story')
+      expect(github.files(github.refs.get('main')!)).toMatchObject(code)
+      expect(Object.keys(github.files(github.refs.get('main')!)).filter((p) => !(p in code)).every((p) => p.startsWith('docs/story/'))).toBe(true)
+    })
+
+    it('ändert beim Push nur Dateien unterhalb des Ordners', async () => {
+      let copy = await load('token', 'o/buch/story')
+      copy = await push('token', await commitLocal({ ...copy, files: { ...copy.files, 'booktime.note.md': 'Neu\n' } }, 'Notiz'))
+      const files = github.files(copy.head)
+      expect(files['story/booktime.note.md']).toBe('Neu\n')
+      expect(files['booktime.note.md']).toBeUndefined()
+      expect(files).toMatchObject(code)
+    })
+
+    it('lehnt einen Ordner mit fremden Dateien ohne booktime.json ab', async () => {
+      await expect(load('token', 'o/buch/src')).rejects.toThrow('Im Ordner src liegt kein Buch')
+    })
   })
 
   it('schließt einen abgebrochenen Push nur noch ab', async () => {

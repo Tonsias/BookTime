@@ -11,11 +11,29 @@ interface Background {
   note?: string
 }
 
+/** Datum im Kalender des Buchs: `era` 0 = vor der ersten Zeitrechnung (rückwärts gezählt), fehlt ohne Zeitrechnungen */
+export interface BookDate {
+  era?: number
+  year: number
+  month?: number
+  day?: number
+}
+
+/** Eigener Kalender eines Buchs; die letzte Zeitrechnung ist offen und hat keine Länge */
+export interface Calendar {
+  months: { name: string; days: number }[]
+  weekdays: string[]
+  firstWeekday: number
+  before: { name: string; short: string }
+  eras: { name: string; short: string; years?: number }[]
+}
+
 /** Benannter Punkt in der Geschichte */
 export interface TimePoint {
   id: string
   name: string
   dateLabel?: string
+  date?: BookDate
   order: number
   background?: Background
   note?: string
@@ -46,7 +64,9 @@ export interface Named extends Element {
 }
 
 /** Person, verortet über Aufenthalte und Reisen */
-type Person = Named
+interface Person extends Named {
+  born?: BookDate
+}
 
 /** Gruppe aus Personen über Mitgliedschaften */
 type Group = Named
@@ -160,6 +180,7 @@ export interface AcceptedHint {
 export interface Book {
   title: string
   note?: string
+  calendar?: Calendar
   acceptedHints: AcceptedHint[]
   timePoints: TimePoint[]
   persons: Person[]

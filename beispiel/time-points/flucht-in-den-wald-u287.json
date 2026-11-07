@@ -1,5 +1,10 @@
 {
   "id": "u287",
   "name": "Flucht in den Wald",
+  "date": {
+    "era": 2,
+    "year": 412,
+    "month": 3
+  },
   "order": 3
 }

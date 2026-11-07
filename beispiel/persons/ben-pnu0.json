@@ -1,6 +1,10 @@
 {
   "id": "pnu0",
   "name": "Ben",
+  "born": {
+    "era": 2,
+    "year": 395
+  },
   "color": "#fb923c",
   "existence": {},
   "images": []

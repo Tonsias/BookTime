@@ -1,6 +1,12 @@
 {
   "id": "u1ii",
   "name": "Anna",
+  "born": {
+    "era": 2,
+    "year": 389,
+    "month": 5,
+    "day": 3
+  },
   "color": "#f87171",
   "existence": {},
   "images": []

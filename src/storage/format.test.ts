@@ -100,3 +100,26 @@ describe('Gewollte Hinweise', () => {
     expect(reasons({ 'accepted-hints.json': json({ accepted: 1 }) })).toEqual(['accepted-hints.json: accepted ist keine Liste'])
   })
 })
+
+describe('Kalender und Daten', () => {
+  const calendar = { months: [{ name: 'Frostmond', days: 30 }], weekdays: ['Erdtag', 'Ruhetag'], firstWeekday: 1, before: { name: 'davor', short: 'v.' }, eras: [{ name: 'Erste', short: 'E.' }] }
+  const dated = {
+    'calendar.json': json(calendar),
+    'time-points/anfang-aaaa.json': json({ id: 'aaaa', name: 'Anfang', dateLabel: 'Frühling', date: { era: 1, year: 412, month: 1, day: 3 }, order: 1 }),
+    'persons/pia-dddd.json': json({ id: 'dddd', name: 'Pia', born: { era: 0, year: 2 }, color: '#445566', existence: {}, images: [] }),
+  }
+
+  it('liest und schreibt Kalender, Datum und Geburtsdatum unverändert', () => {
+    const { book, errors } = load(dated)
+    expect(errors).toEqual([])
+    expect(book.calendar).toEqual(calendar)
+    expect(book.persons[0]!.born).toEqual({ era: 0, year: 2 })
+    expect(bookToFiles(book)).toEqual({ ...minimal, ...dated })
+  })
+
+  it('meldet einen falsch aufgebauten Kalender und lädt das Buch ohne ihn', () => {
+    expect(reasons({ 'calendar.json': json({ eras: [{ name: 'Erste', short: 'E.' }] }) })).toEqual(['calendar.json: before fehlt'])
+    expect(reasons({ 'calendar.json': json({ months: [{ name: 'X', days: 0 }] }) })).toEqual(['calendar.json: months[0].days ist keine ganze Zahl ab 1'])
+    expect(load({ 'calendar.json': json({ weekdays: ['A'], firstWeekday: 2 }) }).book.calendar).toBeUndefined()
+  })
+})

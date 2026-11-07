@@ -1,5 +1,10 @@
 {
   "id": "serm",
   "name": "Verrat auf Ostfels",
+  "date": {
+    "era": 2,
+    "year": 412,
+    "month": 3
+  },
   "order": 4
 }

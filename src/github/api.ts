@@ -1,4 +1,8 @@
+import { splitAddress } from './address'
+
 const API = 'https://api.github.com'
+
+type TreeEntry = { path: string; type: string; sha: string; size: number }
 
 /** Fehlerantwort der GitHub-API */
 class GitHubError extends Error {
@@ -9,15 +13,18 @@ class GitHubError extends Error {
   }
 }
 
-/** Zugang zu einem Repo über die GitHub-API */
+/** Zugang zu einem Buch über die GitHub-API; Dateipfade sind relativ zum Ordner des Buchs (`path`) */
 export class GitHub {
   token: string
   repo: string
+  path: string
 
-  constructor(token: string, repo: string) {
+  constructor(token: string, address: string) {
     this.token = token
-    this.repo = repo
+    ;({ repo: this.repo, path: this.path } = splitAddress(address))
   }
+
+  private full = (path: string) => (this.path ? `${this.path}/${path}` : path)
 
   async request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
     const response = await fetch(`${API}${path.replace('{repo}', `repos/${this.repo}`)}`, {
@@ -70,7 +77,15 @@ export class GitHub {
 
   /** Alle Dateien eines Commits mit Blob-SHA und Größe */
   async tree(commitSha: string) {
-    const { tree } = await this.request<{ tree: { path: string; type: string; sha: string; size: number }[] }>(`/{repo}/git/trees/${commitSha}?recursive=1`)
+    let sha = commitSha
+    // Dem Pfad Ordner für Ordner folgen, damit nur der Baum des Buchs geladen wird
+    for (const part of this.path ? this.path.split('/') : []) {
+      const { tree } = await this.request<{ tree: TreeEntry[] }>(`/{repo}/git/trees/${sha}`)
+      const folder = tree.find((entry) => entry.type === 'tree' && entry.path === part)
+      if (!folder) return []
+      sha = folder.sha
+    }
+    const { tree } = await this.request<{ tree: TreeEntry[] }>(`/{repo}/git/trees/${sha}?recursive=1`)
     return tree.filter((entry) => entry.type === 'blob')
   }
 
@@ -80,7 +95,7 @@ export class GitHub {
     const result: Record<string, string> = {}
     for (let i = 0; i < files.length; i += 100) {
       const batch = files.slice(i, i + 100)
-      const fields = batch.map(({ path }, j) => `f${j}: object(expression: ${JSON.stringify(`${commitSha}:${path}`)}) { ... on Blob { text isTruncated } }`)
+      const fields = batch.map(({ path }, j) => `f${j}: object(expression: ${JSON.stringify(`${commitSha}:${this.full(path)}`)}) { ... on Blob { text isTruncated } }`)
       const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { ${fields.join(' ')} } }`
       const { data, errors } = await this.request<{
         data?: { repository: Record<string, { text: string | null; isTruncated?: boolean } | null> }
@@ -115,14 +130,14 @@ export class GitHub {
   /** Neuer Commit aus Änderungen gegenüber dem Eltern-Commit; null löscht eine Datei */
   async commit(parent: string, message: string, changes: Record<string, { content: string } | { sha: string } | null>) {
     const { tree } = await this.request<{ tree: { sha: string } }>(`/{repo}/git/commits/${parent}`)
-    const entries = Object.entries(changes).map(([path, change]) => ({ path, mode: '100644', type: 'blob', ...(change ?? { sha: null }) }))
+    const entries = Object.entries(changes).map(([path, change]) => ({ path: this.full(path), mode: '100644', type: 'blob', ...(change ?? { sha: null }) }))
     const created = await this.request<{ sha: string }>('/{repo}/git/trees', { method: 'POST', body: { base_tree: tree.sha, tree: entries } })
     return (await this.request<{ sha: string }>('/{repo}/git/commits', { method: 'POST', body: { message, tree: created.sha, parents: [parent] } })).sha
   }
 
   /** Erste Datei in einem leeren Repo, legt dabei den Standardbranch an */
   createFirstFile(path: string, content: string, message: string) {
-    return this.request(`/{repo}/contents/${path}`, { method: 'PUT', body: { message, content: btoa(String.fromCharCode(...new TextEncoder().encode(content))) } })
+    return this.request(`/{repo}/contents/${this.full(path)}`, { method: 'PUT', body: { message, content: btoa(String.fromCharCode(...new TextEncoder().encode(content))) } })
   }
 
   /** Pull Requests von einem Branch, neueste zuerst */

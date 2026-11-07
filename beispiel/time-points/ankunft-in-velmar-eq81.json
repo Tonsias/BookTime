@@ -1,7 +1,13 @@
 {
   "id": "eq81",
   "name": "Ankunft in Velmar",
-  "dateLabel": "Frühling, Jahr 412",
+  "dateLabel": "Frühling",
+  "date": {
+    "era": 2,
+    "year": 412,
+    "month": 2,
+    "day": 14
+  },
   "order": 1,
   "background": {
     "id": "w4k2",

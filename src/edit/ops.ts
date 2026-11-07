@@ -1,5 +1,6 @@
+import { absoluteYear, calendarOf, fromAbsoluteYear } from '../calendar'
 import { problems } from '../checks'
-import { bounds, covers, factLabel, findElement, involvedIds, timeline, worldPosition, type Book, type ElementKind, type Fact, type Image, type Relation, type RelationPhase, type Stay, type Timing } from '../model'
+import { bounds, covers, factLabel, findElement, involvedIds, timeline, worldPosition, type Book, type BookDate, type Calendar, type ElementKind, type Fact, type Image, type Relation, type RelationPhase, type Stay, type Timing } from '../model'
 import { newId } from '../storage/format'
 
 /** Ob zeitliche Werte ab dem aktuellen Zeitpunkt oder für die ganze Phase geändert werden */
@@ -382,4 +383,82 @@ export function imageFiles(book: Book) {
   for (const p of book.places) for (const ph of p.phases) ph.images.forEach((i) => files.add(i.file))
   for (const t of book.timePoints) if (t.background) files.add(t.background.file)
   return files
+}
+
+/** Datum eines Zeitpunkts oder Geburtsdatum einer Person */
+export const dateOf = (book: Book, id: string) => book.timePoints.find((t) => t.id === id)?.date ?? book.persons.find((p) => p.id === id)?.born
+
+/** Setzt das Datum eines Zeitpunkts oder das Geburtsdatum einer Person; ohne Datum wird es entfernt */
+export function setDate(book: Book, id: string, date: BookDate | undefined) {
+  const point = book.timePoints.find((t) => t.id === id)
+  const person = book.persons.find((p) => p.id === id)
+  if (point) {
+    if (date) point.date = date
+    else delete point.date
+  } else if (person) {
+    if (date) person.born = date
+    else delete person.born
+  }
+}
+
+const allDates = (book: Book) => [...book.timePoints.map((t) => t.date), ...book.persons.map((p) => p.born)].filter((d): d is BookDate => !!d)
+
+/** Wie viele Daten einen Monat oder eine Zeitrechnung (Nummer ab 1) nutzen */
+export const dateUses = (book: Book, key: 'month' | 'era', k: number) => allDates(book).filter((d) => d[key] === k).length
+
+/** Ändert den Kalender; ein leerer Kalender entfällt */
+export function setCalendar(book: Book, change: (cal: Calendar) => void) {
+  const cal = structuredClone(calendarOf(book))
+  change(cal)
+  if (cal.months.length || cal.weekdays.length || cal.eras.length) book.calendar = cal
+  else delete book.calendar
+}
+
+// Nur die letzte Zeitrechnung ist offen; eine neue Länge reicht bis zum höchsten genutzten Jahr (Festlegung 17)
+function closeEras(book: Book) {
+  setCalendar(book, (cal) =>
+    cal.eras.forEach((era, i) => {
+      if (i === cal.eras.length - 1) delete era.years
+      else {
+        const used = allDates(book).filter((d) => d.era === i + 1).map((d) => d.year)
+        era.years ??= used.length ? Math.max(...used) : 100
+      }
+    }),
+  )
+}
+
+const listOf = (cal: Calendar, key: 'month' | 'era'): unknown[] => (key === 'month' ? cal.months : cal.eras)
+
+/** Verschiebt einen Monat oder eine Zeitrechnung und passt alle Daten an (Festlegung 16) */
+export function moveCalendarEntry(book: Book, key: 'month' | 'era', from: number, to: number) {
+  const order = listOf(calendarOf(book), key).map((_, k) => k + 1)
+  order.splice(to, 0, ...order.splice(from, 1))
+  setCalendar(book, (cal) => {
+    const list = listOf(cal, key)
+    list.splice(to, 0, ...list.splice(from, 1))
+  })
+  for (const d of allDates(book)) if (d[key]) d[key] = order.indexOf(d[key]) + 1
+  if (key === 'era') closeEras(book)
+}
+
+/** Entfernt einen ungenutzten Monat oder eine Zeitrechnung; die einzige Zeitrechnung auch genutzt, dann zählen die Jahre fortlaufend */
+export function removeCalendarEntry(book: Book, key: 'month' | 'era', index: number) {
+  const cal = calendarOf(book)
+  if (key === 'era' && cal.eras.length === 1)
+    for (const d of allDates(book)) {
+      d.year = absoluteYear(cal, d)
+      delete d.era
+    }
+  else if (dateUses(book, key, index + 1)) return false
+  setCalendar(book, (c) => void listOf(c, key).splice(index, 1))
+  for (const d of allDates(book)) if (d[key] && d[key] > index + 1) d[key]--
+  if (key === 'era') closeEras(book)
+}
+
+/** Hängt eine Zeitrechnung an; bei der ersten werden bisherige Jahre umgerechnet (Festlegung 17) */
+export function addEra(book: Book) {
+  const first = !calendarOf(book).eras.length
+  setCalendar(book, (cal) => void cal.eras.push({ name: `Zeitrechnung ${cal.eras.length + 1}`, short: `Z${cal.eras.length + 1}` }))
+  if (first) for (const d of allDates(book)) Object.assign(d, fromAbsoluteYear(calendarOf(book), d.year))
+  closeEras(book)
 }

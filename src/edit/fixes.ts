@@ -1,7 +1,8 @@
 import type { Hint } from '../checks'
 import { bounds, factLabel, factTiming, findElement, spanLabel, worldPosition, type Book, type Fact, type Image, type Place, type Timing } from '../model'
 import { newId } from '../storage/format'
-import { allIds, removeFact, toTiming, type Recipe, type Span } from './ops'
+import { calendarOf, fitDate, formatDate } from '../calendar'
+import { allIds, dateOf, removeFact, setDate, toTiming, type Recipe, type Span } from './ops'
 
 /** Eine Lösung im Hinweis-Dialog; ohne `recipe` muss die Oberfläche ein Bild hochladen lassen */
 export interface Fix {
@@ -221,6 +222,31 @@ const PLANS: Record<Hint['rule'], (book: Book, hint: Hint) => FixPlan | undefine
       ],
       rows: [{ label: found.owner, span: found.span, color: '#8b93a7' }, { label: found.image.file, span: own, color: '#818cf8' }],
       bad: own,
+    }
+  },
+
+  'date-order': (book, { ids: [id, earlier] }) => {
+    const date = dateOf(book, earlier!)
+    if (!date) return undefined
+    return {
+      fixes: [
+        { label: `Datum von „${name(book, earlier!)}“ übernehmen`, preview: formatDate(calendarOf(book), date), recipe: (dr) => setDate(dr, id!, { ...date }) },
+        { label: 'Datum entfernen', preview: `${name(book, id!)} ohne Datum`, recipe: (dr) => setDate(dr, id!, undefined) },
+      ],
+      rows: [],
+    }
+  },
+
+  'date-calendar': (book, { ids: [id] }) => {
+    const date = dateOf(book, id!)
+    if (!date) return undefined
+    const fitted = fitDate(calendarOf(book), date)
+    return {
+      fixes: [
+        { label: 'An den Kalender anpassen', preview: formatDate(calendarOf(book), fitted), recipe: (dr) => setDate(dr, id!, fitted) },
+        { label: 'Datum entfernen', preview: `${name(book, id!)} ohne Datum`, recipe: (dr) => setDate(dr, id!, undefined) },
+      ],
+      rows: [],
     }
   },
 

@@ -10,7 +10,7 @@ import { LAYER_SIZE } from '../../scene/layout'
 import { useUi } from '../context'
 import { Inline } from '../fields'
 import { PanelHeader } from './ElementPanel'
-import { BookImage, DeleteButton, DropZone, NoteSection, NumberField, Row, Section, TextField } from './parts'
+import { BookImage, DateField, DeleteButton, DropZone, HintRows, NoteSection, NumberField, Row, Section, TextField } from './parts'
 
 /** Editor eines Zeitpunkts: Name, Datum, Reihenfolge, Hintergrund (Festlegung 38) */
 export function TimePointPanel({ point }: { point: TimePoint }) {
@@ -28,8 +28,11 @@ export function TimePointPanel({ point }: { point: TimePoint }) {
   return (
     <Stack gap="md">
       <PanelHeader id={point.id} name={point.name} badge={`Zeitpunkt ${k + 1}`} />
+      <Row label="Bezeichnung">
+        <TextField id={point.id} field="dateLabel" value={point.dateLabel} label="Bezeichnung" placeholder="z. B. Frühling" optional />
+      </Row>
       <Row label="Datum">
-        <TextField id={point.id} field="dateLabel" value={point.dateLabel} label="Datum" placeholder="z. B. Frühling, Jahr 412" optional />
+        <DateField id={point.id} label="Datum" />
       </Row>
       <Row label="Reihenfolge">
         <Group gap="xs">
@@ -44,6 +47,7 @@ export function TimePointPanel({ point }: { point: TimePoint }) {
           </Button>
         </Group>
       </Row>
+      <HintRows id={point.id} />
       <Section title="Hintergrund" action={background && <Anchor component="button" type="button" size="xs" c="red" onClick={() => change('Hintergrund entfernt', (d) => removeImage(d, background.id))}>entfernen</Anchor>}>
         {background ? (
           <Stack gap="xs">

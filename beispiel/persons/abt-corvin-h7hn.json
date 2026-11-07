@@ -1,6 +1,12 @@
 {
   "id": "h7hn",
   "name": "Abt Corvin",
+  "born": {
+    "era": 2,
+    "year": 350,
+    "month": 1,
+    "day": 20
+  },
   "color": "#fde68a",
   "existence": {
     "to": "serm"

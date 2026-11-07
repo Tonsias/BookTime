@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Spotlight, spotlight, type SpotlightActionGroupData } from '@mantine/spotlight'
 import type { NewKind } from '../edit/ops'
+import { calendarOf, formatDate } from '../calendar'
 import { bounds, elementColor, type ElementKind } from '../model'
 import { useUi } from './context'
 
@@ -73,7 +74,7 @@ export function Search({ onCreate }: { onCreate: (kind: NewKind, name: string) =
       actions: points.map((t, i) => ({
         id: t.id,
         label: `${i + 1}. ${t.name}`,
-        description: t.dateLabel,
+        description: [t.dateLabel, t.date && formatDate(calendarOf(book), t.date)].filter(Boolean).join(' · '),
         onClick: () => {
           jump(i)
           select({ kind: 'timePoint', id: t.id })

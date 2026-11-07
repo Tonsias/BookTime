@@ -1,3 +1,4 @@
+import { calendarMismatch, calendarOf, compareDates, dateError, formatDate } from './calendar'
 import { bounds, covers, factLabel, factTiming, findElement, involvedIds, placeChain, spanLabel, timeline, type Book, type Fact, type Image, type Place, type Timing } from './model'
 
 /** Art eines Hinweises; mit den beteiligten IDs ein stabiler Schlüssel */
@@ -14,6 +15,8 @@ export type HintRule =
   | 'outside-radius'
   | 'image-time'
   | 'image-missing'
+  | 'date-order'
+  | 'date-calendar'
 
 /** Widerspruch, den das Modell erlaubt, auf den die Oberfläche aber hinweist */
 export interface Hint {
@@ -72,6 +75,10 @@ export function problems(book: Book): Problem[] {
     }
   })
   cyclic.forEach((id) => found.push({ id, reason: 'Ort liegt in sich selbst' }))
+  for (const { id, date } of datesOf(book)) {
+    const reason = dateError(date)
+    if (reason) found.push({ id, reason })
+  }
   return found
 }
 
@@ -104,6 +111,7 @@ export function hints(book: Book, available?: string[]): Hint[] {
   relationHints(book, add)
   for (const place of book.places) placeHints(book, place, add)
   imageHints(book, add)
+  dateHints(book, add)
   if (available) missingImages(book, new Set(available), add)
   return found.sort((a, b) => a.at - b.at)
 }
@@ -221,6 +229,26 @@ function imageHints(book: Book, add: Add) {
     for (const image of element.images) check(element.id, image, life, `der Existenz von ${name(book, element.id)}`)
   }
   for (const place of book.places) for (const phase of place.phases) for (const image of phase.images) check(place.id, image, bounds(book, phase.timing), 'seiner Orts-Phase')
+}
+
+const datesOf = (book: Book) => [
+  ...book.timePoints.flatMap((t) => (t.date ? [{ id: t.id, date: t.date, what: `Datum von „${t.name}“` }] : [])),
+  ...book.persons.flatMap((p) => (p.born ? [{ id: p.id, date: p.born, what: `Geburtsdatum von „${p.name}“` }] : [])),
+]
+
+function dateHints(book: Book, add: Add) {
+  const cal = calendarOf(book)
+  const points = timeline(book)
+  points.forEach((point, i) => {
+    const earlier = point.date && points.slice(0, i).find((q) => q.date && compareDates(cal, point.date!, q.date) < 0)
+    if (earlier)
+      add('date-order', [point.id, earlier.id], [point.id], i, `„${point.name}“ (${formatDate(cal, point.date!)}) liegt vor „${earlier.name}“ (${formatDate(cal, earlier.date!)}), steht aber danach`)
+  })
+  const at = new Map(points.map((t, i) => [t.id, i]))
+  for (const { id, date, what } of datesOf(book)) {
+    const reason = calendarMismatch(cal, date)
+    if (reason) add('date-calendar', [id], [id], at.get(id) ?? 0, `${what} passt nicht zum Kalender: ${reason}`)
+  }
 }
 
 function missingImages(book: Book, available: Set<string>, add: Add) {

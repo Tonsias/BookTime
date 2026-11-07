@@ -27,7 +27,7 @@ export default defineConfig({
     // three allein ist größer als die Standardgrenze von 500 kB
     chunkSizeWarningLimit: 800,
     rolldownOptions: {
-      input: { main: 'index.html', github: 'github.html' },
+      input: { main: 'index.html', github: 'github.html', kalender: 'kalender.html' },
       output: {
         codeSplitting: {
           groups: [

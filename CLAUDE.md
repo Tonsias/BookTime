@@ -51,12 +51,15 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 
 - `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
   Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`, `backgroundAt`)
+- `src/calendar.ts` – Datum und eigener Kalender nach `docs/2026-11-kalender.md`: Umrechnung, Anzeige, Alter
+- `src/calendar/` – eigene Seite `kalender.html` zum Bearbeiten des Kalenders
 - `src/checks.ts` – Prüfungen nach Festlegung 14 des Datenmodells: Verbote (`problems`, beim Laden und Bearbeiten) und Hinweise (`hints`)
 - `src/edit/` – Editor nach `docs/2026-11-editor.md`: reine Änderungen `Book → Book` (`ops`), Lösungen zu Hinweisen
   (`fixes`), Speichern als Dateiunterschied (`save`), Stand und Verlauf (`useEditor`)
 - `src/storage/` – Dateiformat eines Buchs (`bookToFiles`, `filesToBook` mit Prüfung) nach
   `docs/2026-10-speicherung-github.md`, Beispielbuch aus `beispiel/`
-- `src/github/` – eigene Seite `github.html`: Token, Bücher, Arbeitskopie (IndexedDB), Commit, Push, Pull Request
+- `src/github/` – eigene Seite `github.html`: Token, Bücher (auch im Unterordner, `docs/2026-11-unterordner.md`),
+  Arbeitskopie (IndexedDB), Commit, Push, Pull Request
 - `beispiel/` – Beispielbuch im Repo-Format, wird von `npm run check` geprüft
 - `src/scene/` – 3D-Szene und Layout (Zeit = x-Achse, Netz = y/z-Ebene), Ziehen auf der aktuellen Ebene (`Gestures`, `hits`)
 - `src/ui/` – Mantine-Oberfläche: Leisten, Felder, Dialoge, Suche, Editor-Panels (`panel/`)

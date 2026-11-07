@@ -43,6 +43,8 @@ const CASES: Record<HintRule, Book> = {
   'outside-radius': base({ places: [place('a', { radius: 2 }), place('b', { phases: [{ id: 'l', timing: {}, parent: 'a', x: 5, y: 0, images: [] }] })] }),
   'image-time': base({ persons: [person('p', { to: 't2' }), person('q')], facts: [], places: [place('a'), place('b')], groups: [] }),
   'image-missing': base({ persons: [{ ...person('p'), images: [{ id: 'i', file: 'images/p-iiii.png', order: 1 }] }, person('q')] }),
+  'date-order': base({ timePoints: [{ ...point('t1', 1), date: { year: 5 } }, { ...point('t2', 2), date: { year: 3 } }] }),
+  'date-calendar': base({ persons: [{ ...person('p'), born: { year: 1, month: 2, day: 9 } }, person('q')] }),
 }
 CASES['image-time'].persons[0]!.images.push({ id: 'i', file: 'images/p-iiii.png', order: 1, timing: { from: 't2' } })
 

@@ -3,9 +3,11 @@ import { ActionIcon, Anchor, Button, Group, Kbd, Menu, Paper, SegmentedControl, 
 import { spotlight } from '@mantine/spotlight'
 import type { NewKind, Scope } from '../edit/ops'
 import type { SaveStatus } from '../edit/useEditor'
+import { calendarOf } from '../calendar'
 import { covers } from '../model'
 import type { Layout } from '../scene/layout'
 import { useUi } from './context'
+import { DateText } from './fields'
 import type { View } from './types'
 
 const NEW_ITEMS: [NewKind, string, string][] = [
@@ -68,6 +70,9 @@ export function Toolbar(props: ToolbarProps) {
                 {pending}
               </Text>
             )}
+            <Anchor href="kalender.html" size="xs">
+              Kalender
+            </Anchor>
             {hints.length > 0 && (
               <Anchor component="button" type="button" size="xs" c="yellow" onClick={() => openHint()}>
                 {hints.length} {hints.length === 1 ? 'Hinweis' : 'Hinweise'} auflösen
@@ -159,7 +164,7 @@ function NewMenu({ newOpen, onNewOpen, onNew }: ToolbarProps) {
 
 /** Zeitleiste mit Umschalter „Ab hier / Ganze Phase“ (Festlegung 14) */
 export function Timebar({ onScope, onAdd }: { onScope: (scope: Scope) => void; onAdd: () => void }) {
-  const { points, current, scope, jump, select } = useUi()
+  const { book, points, current, scope, jump, select } = useUi()
   const point = points[current]!
   const last = points.length - 1
   return (
@@ -175,6 +180,7 @@ export function Timebar({ onScope, onAdd }: { onScope: (scope: Scope) => void; o
             {point.dateLabel}
           </Text>
         )}
+        {point.date && <DateText cal={calendarOf(book)} date={point.date} prefix={point.dateLabel ? '· ' : ''} />}
         <SegmentedControl
           ml="auto"
           size="xs"

@@ -1,8 +1,9 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ColorSwatch, Group, Kbd, Popover, RangeSlider, SimpleGrid, Stack, Text, TextInput, Textarea, Typography, UnstyledButton } from '@mantine/core'
+import { ColorSwatch, Group, Kbd, Popover, RangeSlider, SimpleGrid, Stack, Text, TextInput, Textarea, Tooltip, Typography, UnstyledButton } from '@mantine/core'
 import ReactMarkdown from 'react-markdown'
 import { PALETTE, type Span } from '../edit/ops'
-import { spanLabel } from '../model'
+import { formatDate, untilNextEra } from '../calendar'
+import { spanLabel, type BookDate, type Calendar } from '../model'
 import { useUi } from './context'
 
 /** Markdown ohne rohes HTML; Links öffnen in einem neuen Tab */
@@ -294,5 +295,25 @@ export function RefPicker(props: Omit<PickerProps, 'opened' | 'onClose' | 'targe
         </UnstyledButton>
       }
     />
+  )
+}
+
+/** Datum als Text, mit ⓘ und dem Abstand zur nächsten Zeitrechnung im Tooltip */
+export function DateText({ cal, date, prefix }: { cal: Calendar; date: BookDate; prefix?: string }) {
+  const next = untilNextEra(cal, date)
+  return (
+    <Group component="span" gap={4} wrap="nowrap" display="inline-flex">
+      <Text span size="xs" c="dimmed">
+        {prefix}
+        {formatDate(cal, date)}
+      </Text>
+      {next && (
+        <Tooltip label={next}>
+          <Text span size="xs" c="dimmed" className="era-info" tabIndex={0} aria-label={next}>
+            ⓘ
+          </Text>
+        </Tooltip>
+      )}
+    </Group>
   )
 }

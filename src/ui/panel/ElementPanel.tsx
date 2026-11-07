@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { Badge, Group, Stack, Switch, Text, Timeline, UnstyledButton } from '@mantine/core'
 import { addImage, allIds, byId, changeAt, moveStay, setText, toTiming } from '../../edit/ops'
 import { newId } from '../../storage/format'
+import { age, calendarOf } from '../../calendar'
 import { removeImage } from '../../edit/fixes'
 import { bounds, covers, factTiming, factsAt, findElement, imageAt, involvedIds, phaseAt, placeChain, spanLabel, type Book, type ElementKind, type Fact, type Image, type Named, type Place, type StoryEvent } from '../../model'
 import { useUi } from '../context'
 import { ColorField, Inline, RefPicker, SpanField } from '../fields'
 import { AddLink, FactEditor } from './Facts'
-import { Clickable, BookImage, DeleteButton, DropZone, HintRows, NoteSection, NumberField, Ref, Row, Section, TextField } from './parts'
+import { Clickable, BookImage, DateField, DeleteButton, DropZone, HintRows, NoteSection, NumberField, Ref, Row, Section, TextField } from './parts'
 import { optionsOf, useCreate, when } from './lookup'
 
 const KIND_LABELS: Record<ElementKind, string> = { person: 'Person', group: 'Gruppe', place: 'Ort', event: 'Event' }
@@ -60,6 +61,7 @@ function NamedDetails({ id, kind }: { id: string; kind: Exclude<ElementKind, 'ev
       <Row label="Existiert">
         <SpanField span={bounds(book, element.existence)} label="Existenz" onCommit={(span) => change('Existenz geändert', (d) => void (byId<{ existence: unknown }>(d, id).existence = toTiming(d, span)))} />
       </Row>
+      {kind === 'person' && <BirthRows id={id} />}
       {kind === 'place' && <PlaceDetails place={book.places.find((p) => p.id === id)!} />}
       {kind !== 'place' && (
         <Section title={`Stand: ${current + 1}. ${points[current]?.name ?? ''}`} action={<AddLink me={id} person={kind === 'person'} />}>
@@ -304,5 +306,24 @@ function ImageSection({ id, name, images }: { id: string; name: string; images: 
         </Text>
       </DropZone>
     </Section>
+  )
+}
+
+// Alter zum aktuellen Zeitpunkt nur, wenn Geburt und Zeitpunkt ein Datum haben (Festlegung 19 des Kalenders)
+function BirthRows({ id }: { id: string }) {
+  const { book, points, current } = useUi()
+  const born = book.persons.find((p) => p.id === id)?.born
+  const at = points[current]?.date
+  return (
+    <>
+      <Row label="Geboren">
+        <DateField id={id} label="Geburtsdatum" />
+      </Row>
+      {born && at && (
+        <Row label="Alter">
+          <Text size="sm">{age(calendarOf(book), born, at)}</Text>
+        </Row>
+      )}
+    </>
   )
 }

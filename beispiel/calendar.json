@@ -1,0 +1,51 @@
+{
+  "months": [
+    {
+      "name": "Frostmond",
+      "days": 30
+    },
+    {
+      "name": "Saatmond",
+      "days": 31
+    },
+    {
+      "name": "Blütenmond",
+      "days": 30
+    },
+    {
+      "name": "Sonnmond",
+      "days": 31
+    },
+    {
+      "name": "Erntemond",
+      "days": 30
+    },
+    {
+      "name": "Nebelmond",
+      "days": 29
+    }
+  ],
+  "weekdays": [
+    "Erdtag",
+    "Wassertag",
+    "Feuertag",
+    "Windtag",
+    "Ruhetag"
+  ],
+  "firstWeekday": 0,
+  "before": {
+    "name": "vor dem Ersten Zeitalter",
+    "short": "v. E."
+  },
+  "eras": [
+    {
+      "name": "Erstes Zeitalter",
+      "short": "E.",
+      "years": 590
+    },
+    {
+      "name": "Zweites Zeitalter",
+      "short": "Z."
+    }
+  ]
+}

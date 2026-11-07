@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookTime · Kalender (Prototyp)</title>
+<style>
+  :root {
+    --bg: #0b0d12; --ov: rgba(20, 22, 30, 0.92); --bd: #2f3444; --bd2: #3a4152; --tx: #d5d9e3; --dim: #8b93a7;
+    --pri: #6b8cff; --pri-bg: rgba(107, 140, 255, 0.18); --red: #f87171; --yel: #facc15; --ok: #4ade80; --field: #151820;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--tx); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  .proto { position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 50; display: flex; gap: 8px; align-items: center; padding: 0 12px; background: #1a1430; border-bottom: 1px solid #3b2f6b; font-size: 12px; color: #c4b5fd; }
+  .proto b { margin-right: 6px; }
+  .proto .sp { flex: 1; }
+  .page { position: absolute; top: 40px; left: 0; right: 0; bottom: 0; overflow: auto; }
+  .hidden { display: none !important; }
+
+  /* Buchansicht */
+  .scene { position: absolute; inset: 0; overflow: hidden; background:
+      radial-gradient(circle at 45% 50%, rgba(107,140,255,.08), transparent 55%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 48px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 48px); }
+  .overlay { position: absolute; z-index: 20; background: var(--ov); backdrop-filter: blur(8px); border: 1px solid var(--bd); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  .toolbar { top: 16px; left: 16px; width: 290px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .book-title { font-size: 17px; font-weight: 700; }
+  .meta { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--dim); flex-wrap: wrap; }
+  .link { background: none; border: 0; padding: 0; color: var(--pri); cursor: pointer; font-size: 12px; }
+  .link.warn { color: var(--yel); }
+  .new { outline: 2px dashed var(--yel); outline-offset: 2px; border-radius: 4px; }
+  .people { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: #1d212c; border: 1px solid var(--bd2); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .chip.on { border-color: var(--pri); background: var(--pri-bg); }
+
+  .panel { top: 16px; right: 16px; width: 360px; max-height: calc(100% - 130px); overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .ph { display: flex; justify-content: space-between; align-items: center; }
+  .ph h3 { margin: 0; font-size: 16px; }
+  .badge { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); background: #232836; border-radius: 4px; padding: 2px 6px; }
+  .row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: center; }
+  .row > label, .row > .lab { font-size: 12px; color: var(--dim); }
+  .row .val { min-height: 28px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  input[type=text], input[type=number], select { background: var(--field); border: 1px solid var(--bd2); border-radius: 6px; padding: 4px 7px; min-width: 0; }
+  input:disabled, select:disabled { opacity: .35; }
+  input:focus, select:focus { outline: 1px solid var(--pri); border-color: var(--pri); }
+  .date { display: flex; gap: 4px; flex-wrap: wrap; }
+  .date .era { width: 100%; }
+  .date .y { width: 64px; }
+  .date .m { flex: 1; min-width: 90px; }
+  .date .d { width: 50px; }
+  .hint { border: 1px solid rgba(250,204,21,.35); background: rgba(250,204,21,.08); color: #fde68a; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .muted { color: var(--dim); font-size: 12px; }
+  .info { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--dim); color: var(--dim); font-size: 10px; font-style: normal; cursor: help; position: relative; font-weight: 700; }
+  .info:hover, .info:focus { color: var(--tx); border-color: var(--tx); outline: none; }
+  .info::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); right: -6px; white-space: nowrap; background: #000; border: 1px solid var(--bd2); color: var(--tx); font-weight: 400; font-size: 12px; padding: 4px 8px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity .12s; }
+  .info:hover::after, .info:focus::after { opacity: 1; }
+
+  .timebar { left: 50%; transform: translateX(-50%); bottom: 16px; width: min(760px, calc(100% - 32px)); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .tb-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .tb-top .name { font-weight: 600; cursor: pointer; }
+  .tb-dates { font-size: 12px; color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+  .dots { display: flex; align-items: center; gap: 0; }
+  .dots button { flex: 1; background: none; border: 0; cursor: pointer; padding: 6px 0; position: relative; color: var(--dim); font-size: 11px; }
+  .dots button::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--bd2); }
+  .dots button span { display: block; width: 12px; height: 12px; margin: -11px auto 4px; border-radius: 50%; background: #3a4152; border: 2px solid var(--bg); position: relative; }
+  .dots button.on span { background: var(--pri); }
+  .dots button.on { color: var(--tx); }
+
+  /* Kalender-Seite */
+  .container { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; display: flex; flex-direction: column; gap: 20px; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  .head h2 { margin: 0; font-size: 24px; }
+  .head nav { display: flex; gap: 14px; }
+  .head nav a { color: var(--pri); text-decoration: none; font-size: 14px; cursor: pointer; }
+  .section { background: #12151c; border: 1px solid var(--bd); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .section h3 { margin: 0; font-size: 16px; }
+  .section .sub { color: var(--dim); font-size: 13px; margin: -4px 0 0; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 4px 6px; text-align: left; font-weight: 400; }
+  th { font-size: 12px; color: var(--dim); }
+  td.n { color: var(--dim); width: 28px; font-variant-numeric: tabular-nums; }
+  td input[type=text] { width: 100%; }
+  td input[type=number] { width: 80px; }
+  td.acts { white-space: nowrap; width: 1%; }
+  .ib { background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer; padding: 2px 7px; color: var(--dim); }
+  .ib:hover:not(:disabled) { border-color: var(--bd2); color: var(--tx); }
+  .ib:disabled { opacity: .25; cursor: default; }
+  .ib.del:hover:not(:disabled) { color: var(--red); }
+  .btn { align-self: flex-start; background: #1d212c; border: 1px solid var(--bd2); border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+  .btn:hover { background: #262b38; }
+  .open { color: var(--dim); font-size: 12px; }
+  .preview { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 13px; }
+  .preview .lab { color: var(--dim); }
+  .toast { position: fixed; right: 16px; bottom: 16px; z-index: 60; background: #2a1a1a; border: 1px solid rgba(248,113,113,.5); color: #fecaca; border-radius: 8px; padding: 8px 12px; font-size: 13px; max-width: 420px; }
+  .status { font-size: 12px; color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+  .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  .empty { border: 1px dashed var(--bd2); border-radius: 8px; padding: 10px 12px; color: var(--dim); font-size: 13px; }
+  @media (max-width: 760px) {
+    .panel { left: 16px; width: auto; top: 260px; max-height: calc(100% - 400px); }
+  }
+</style>
+</head>
+<body>
+<div class="proto">
+  <b>Prototyp</b>
+  <button class="chip" data-go="main">Buchansicht</button>
+  <button class="chip" data-go="cal">Kalender-Seite</button>
+  <span class="sp"></span>
+  <span><span class="new" style="padding:0 4px">gelb gestrichelt</span> = neu</span>
+  <button class="chip" id="withCal">Beispiel mit Kalender</button>
+  <button class="chip" id="noCal">Beispiel ohne Kalender</button>
+</div>
+
+<div class="page" id="main">
+  <div class="scene"></div>
+  <div class="overlay toolbar">
+    <div class="book-title">Der Brief von Velmar</div>
+    <div class="meta"><span class="status"><i></i>Gespeichert</span></div>
+    <div class="meta">
+      <button class="link">Keine Änderungen · GitHub</button>
+      <button class="link new" data-go="cal">Kalender</button>
+      <button class="link warn" id="hintCount"></button>
+    </div>
+    <div class="muted">Auswählen (im Prototyp statt Szene):</div>
+    <div class="people" id="people"></div>
+  </div>
+  <div class="overlay panel" id="panel"></div>
+  <div class="overlay timebar">
+    <div class="tb-top" id="tbTop"></div>
+    <div class="dots" id="dots"></div>
+  </div>
+</div>
+
+<div class="page hidden" id="cal">
+  <div class="container">
+    <div class="head">
+      <h2>BookTime · Kalender</h2>
+      <nav><a data-go="main">Zur Buchansicht</a><a>GitHub</a></nav>
+    </div>
+    <div class="meta"><span>Der Brief von Velmar · Tonsias/velmar</span><span class="status"><i></i>Gespeichert</span><span>Rückgängig mit <b>Strg+Z</b></span></div>
+    <div id="calEmpty" class="empty">Dieses Buch hat keinen eigenen Kalender, Daten bestehen nur aus Jahreszahlen. Lege Monate, Wochentage oder Zeitrechnungen an, um ihn einzurichten.</div>
+
+    <div class="section">
+      <h3>Monate</h3>
+      <p class="sub">Reihenfolge und Länge eines Jahres. Ohne Monate haben Daten nur ein Jahr.</p>
+      <table><thead><tr><th></th><th>Name</th><th>Tage</th><th></th></tr></thead><tbody id="months"></tbody></table>
+      <button class="btn" id="addMonth">+ Monat</button>
+    </div>
+
+    <div class="section">
+      <h3>Wochentage</h3>
+      <p class="sub">Erscheinen bei Daten mit Jahr, Monat und Tag.</p>
+      <table><tbody id="weekdays"></tbody></table>
+      <button class="btn" id="addWeekday">+ Wochentag</button>
+      <div class="row" id="anchorRow" style="grid-template-columns: max-content 1fr; max-width: 520px;">
+        <label for="anchor" id="anchorLabel">Erster Tag von Jahr 1 ist ein</label>
+        <div class="val"><select id="anchor"></select></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Zeitrechnungen</h3>
+      <p class="sub">Folgen aufeinander, jede beginnt bei Jahr 1. Die letzte läuft noch und hat keine Länge. Davor wird rückwärts gezählt.</p>
+      <table>
+        <thead><tr><th></th><th>Name</th><th>Kürzel</th><th>Jahre</th><th></th></tr></thead>
+        <tbody id="eras"></tbody>
+      </table>
+      <button class="btn" id="addEra">+ Zeitrechnung</button>
+    </div>
+
+    <div class="section">
+      <h3>Vorschau</h3>
+      <div class="preview" id="preview"></div>
+    </div>
+  </div>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script>
+const clone = (x) => JSON.parse(JSON.stringify(x))
+const CAL = {
+  months: [
+    { name: 'Frostmond', days: 30 }, { name: 'Saatmond', days: 31 }, { name: 'Blütenmond', days: 30 },
+    { name: 'Sonnmond', days: 31 }, { name: 'Erntemond', days: 30 }, { name: 'Nebelmond', days: 29 },
+  ],
+  weekdays: ['Erdtag', 'Wassertag', 'Feuertag', 'Windtag', 'Ruhetag'],
+  firstWeekday: 0,
+  before: { name: 'vor dem Ersten Zeitalter', short: 'v. E.' },
+  eras: [
+    { name: 'Erstes Zeitalter', short: 'E.', years: 590 },
+    { name: 'Zweites Zeitalter', short: 'Z.', years: 420 },
+    { name: 'Drittes Zeitalter', short: 'D.' },
+  ],
+}
+const POINTS = [
+  { name: 'Ankunft in Velmar', label: 'Frühling', date: { era: 2, year: 412, month: 2, day: 14 } },
+  { name: 'Der gestohlene Brief', label: '', date: { era: 2, year: 412, month: 3, day: 2 } },
+  { name: 'Flucht in den Wald', label: '', date: { era: 2, year: 413 } },
+  { name: 'Verrat auf Ostfels', label: 'Winter', date: { era: 2, year: 412, month: 6 } },
+  { name: 'Das Konzil', label: '', date: { era: 3, year: 2 } },
+]
+const PERSONS = [
+  { name: 'Anna', color: '#e07a5f', born: { era: 2, year: 389, month: 5, day: 3 } },
+  { name: 'Ben', color: '#81b29a', born: { era: 2, year: 395 } },
+  { name: 'Abt Corvin', color: '#f2cc8f', born: { era: 2, year: 350, month: 1, day: 20 } },
+  { name: 'Mira', color: '#c084fc', born: { era: 2, year: 413, month: 1, day: 1 } },
+  { name: 'Kael', color: '#60a5fa' },
+]
+const PLAIN = { months: [], weekdays: [], firstWeekday: 0, before: { name: 'vor der ersten Zeitrechnung', short: 'v. Z.' }, eras: [] }
+const PLAIN_POINTS = [{ year: 412 }, { year: 412 }, { year: 413 }, { year: 412 }, { year: 1003 }]
+const PLAIN_PERSONS = [{ year: 389 }, { year: 395 }, { year: 350 }, { year: 413 }, null]
+
+let cal, points, persons
+let current = 0
+let selected = { kind: 'timePoint' }
+
+function reset(withCalendar) {
+  cal = clone(withCalendar ? CAL : PLAIN)
+  points = clone(POINTS)
+  persons = clone(PERSONS)
+  if (!withCalendar) {
+    points.forEach((p, i) => (p.date = PLAIN_POINTS[i]))
+    persons.forEach((p, i) => (PLAIN_PERSONS[i] ? (p.born = PLAIN_PERSONS[i]) : delete p.born))
+  }
+  render()
+}
+
+// ---------- Rechnen (später src/calendar.ts) ----------
+const mod = (a, n) => ((a % n) + n) % n
+const eraStart = (k) => 1 + cal.eras.slice(0, k - 1).reduce((s, e) => s + (e.years ?? 0), 0)
+const absYear = (d) => (d.era === undefined ? d.year : d.era === 0 ? 1 - d.year : eraStart(d.era) + d.year - 1)
+const yearDays = () => cal.months.reduce((s, m) => s + m.days, 0)
+const dayNumber = (d) => (absYear(d) - 1) * yearDays() + cal.months.slice(0, d.month - 1).reduce((s, m) => s + m.days, 0) + d.day - 1
+const full = (d) => d && d.month && d.day
+const eraShort = (d) => (d.era === undefined ? '' : d.era === 0 ? cal.before.short : cal.eras[d.era - 1]?.short ?? '?')
+
+function compare(a, b) {
+  const y = absYear(a) - absYear(b)
+  if (y || !a.month || !b.month) return y
+  const m = a.month - b.month
+  if (m || !a.day || !b.day) return m
+  return a.day - b.day
+}
+function weekday(d) {
+  if (!full(d) || !cal.weekdays.length || !cal.months.length) return ''
+  return cal.weekdays[mod(cal.firstWeekday + dayNumber(d), cal.weekdays.length)]
+}
+function formatDate(d) {
+  if (!d) return ''
+  const month = d.month ? cal.months[d.month - 1]?.name ?? `Monat ${d.month}` : ''
+  const wd = weekday(d)
+  return `${wd ? wd + ', ' : ''}${d.day ? d.day + '. ' : ''}${month ? month + ' ' : ''}${d.year}${eraShort(d) ? ' ' + eraShort(d) : ''}`
+}
+function untilNextEra(d) {
+  if (!d || d.era === undefined || d.era >= cal.eras.length) return ''
+  const next = cal.eras[d.era]
+  const years = eraStart(d.era + 1) - absYear(d)
+  return `${years} ${years === 1 ? 'Jahr' : 'Jahre'} vor Beginn von „${next.name}“`
+}
+function age(born, at) {
+  if (!born || !at) return null
+  const exact = full(born) && full(at) && cal.months.length
+  if (compare(at, born) < 0) return 'noch nicht geboren'
+  let years = absYear(at) - absYear(born)
+  if (exact && (at.month < born.month || (at.month === born.month && at.day < born.day))) years--
+  return `${exact ? '' : 'ca. '}${years} ${years === 1 ? 'Jahr' : 'Jahre'}`
+}
+function calendarProblem(d) {
+  if (!d) return ''
+  if (cal.eras.length && d.era === undefined) return 'Die Zeitrechnung fehlt.'
+  if (d.era > cal.eras.length) return `Die Zeitrechnung ${d.era} gibt es im Kalender nicht.`
+  const era = cal.eras[d.era - 1]
+  if (era?.years && d.year > era.years) return `${era.name} dauert nur ${era.years} Jahre.`
+  if (d.month && !cal.months.length) return 'Der Kalender hat keine Monate.'
+  if (d.month > cal.months.length) return `Den Monat ${d.month} gibt es im Kalender nicht.`
+  if (d.day > (cal.months[d.month - 1]?.days ?? 0)) return `${cal.months[d.month - 1].name} hat nur ${cal.months[d.month - 1].days} Tage.`
+  return ''
+}
+function orderHints() {
+  const list = []
+  points.forEach((p, i) => {
+    points.slice(0, i).forEach((q, j) => {
+      if (p.date && q.date && compare(p.date, q.date) < 0) list.push({ at: i, text: `Das Datum liegt vor dem von Zeitpunkt ${j + 1} „${q.name}“ (${formatDate(q.date)}).` })
+    })
+  })
+  return list
+}
+const allDates = () => [...points.map((p) => p.date), ...persons.map((p) => p.born)].filter(Boolean)
+
+// ---------- Datumsfelder ----------
+function dateFields(date, onChange) {
+  const box = document.createElement('div')
+  box.className = 'date'
+  const d = date ? { ...date } : {}
+  const emit = () => onChange(d.year === undefined || Number.isNaN(d.year) ? undefined : clean(d))
+  const clean = (x) => { const o = {}; if (x.era !== undefined) o.era = x.era; o.year = x.year; if (x.month) o.month = x.month; if (x.month && x.day) o.day = x.day; return o }
+  if (cal.eras.length) {
+    const era = document.createElement('select')
+    era.className = 'era'
+    era.setAttribute('aria-label', 'Zeitrechnung')
+    ;[cal.before.name, ...cal.eras.map((e) => e.name)].forEach((name, k) => era.add(new Option(name, k)))
+    era.value = d.era ?? cal.eras.length
+    if (d.era === undefined) d.era = cal.eras.length
+    era.onchange = () => { d.era = +era.value; emit() }
+    box.append(era)
+  }
+  const year = document.createElement('input')
+  year.type = 'number'; year.className = 'y'; year.placeholder = 'Jahr'; year.setAttribute('aria-label', 'Jahr')
+  if (cal.eras.length) year.min = 1
+  year.value = date?.year ?? ''
+  year.onchange = () => { d.year = year.value === '' ? undefined : +year.value; if (d.year === undefined) { delete d.month; delete d.day } ; emit() }
+  box.append(year)
+  if (cal.months.length) {
+    const month = document.createElement('select')
+    month.className = 'm'; month.setAttribute('aria-label', 'Monat')
+    month.add(new Option('Monat —', ''))
+    cal.months.forEach((m, k) => month.add(new Option(m.name, k + 1)))
+    month.value = date?.month ?? ''
+    month.disabled = date?.year === undefined
+    month.onchange = () => { d.month = month.value ? +month.value : undefined; if (!d.month) delete d.day; emit() }
+    const day = document.createElement('input')
+    day.type = 'number'; day.className = 'd'; day.placeholder = 'Tag'; day.min = 1; day.setAttribute('aria-label', 'Tag')
+    day.max = cal.months[(date?.month ?? 1) - 1]?.days ?? 31
+    day.value = date?.day ?? ''
+    day.disabled = !date?.month
+    day.onchange = () => { d.day = day.value ? +day.value : undefined; emit() }
+    box.append(month, day)
+  }
+  return box
+}
+
+const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const infoIcon = (d) => { const tip = untilNextEra(d); return tip ? `<i class="info" tabindex="0" data-tip="${esc(tip)}" aria-label="${esc(tip)}">i</i>` : '' }
+
+function row(label, content, isNew) {
+  const r = el(`<div class="row"><div class="lab">${label}</div><div class="val"></div></div>`)
+  if (isNew) r.querySelector('.lab').classList.add('new')
+  r.querySelector('.val').append(content)
+  return r
+}
+
+// ---------- Buchansicht ----------
+function renderMain() {
+  const p = points[current]
+  const hints = orderHints()
+  const calHints = allDates().filter((d) => calendarProblem(d)).length
+  const n = hints.length + calHints
+  document.getElementById('hintCount').textContent = n ? `${n} ${n === 1 ? 'Hinweis' : 'Hinweise'} auflösen` : ''
+
+  const people = document.getElementById('people')
+  people.replaceChildren(
+    el(`<button class="chip ${selected.kind === 'timePoint' ? 'on' : ''}">Zeitpunkt</button>`),
+    ...persons.map((q, i) => el(`<button class="chip ${selected.kind === 'person' && selected.i === i ? 'on' : ''}"><i style="background:${q.color}"></i>${esc(q.name)}</button>`)),
+  )
+  people.children[0].onclick = () => { selected = { kind: 'timePoint' }; render() }
+  persons.forEach((_, i) => (people.children[i + 1].onclick = () => { selected = { kind: 'person', i }; render() }))
+
+  const top = document.getElementById('tbTop')
+  const dateText = formatDate(p.date)
+  top.innerHTML = `<span class="name">${current + 1}. ${esc(p.name)}</span><span class="tb-dates new">${[p.label, dateText].filter(Boolean).map(esc).join(' · ')} ${infoIcon(p.date)}</span>`
+  top.querySelector('.name').onclick = () => { selected = { kind: 'timePoint' }; render() }
+  const dots = document.getElementById('dots')
+  dots.replaceChildren(...points.map((q, i) => el(`<button class="${i === current ? 'on' : ''}" title="${esc(q.name)}"><span></span>${i + 1}</button>`)))
+  ;[...dots.children].forEach((b, i) => (b.onclick = () => { current = i; render() }))
+
+  const panel = document.getElementById('panel')
+  panel.replaceChildren()
+  if (selected.kind === 'timePoint') {
+    panel.append(el(`<div class="ph"><h3>${esc(p.name)}</h3><span class="badge">Zeitpunkt ${current + 1}</span></div>`))
+    const label = el(`<input type="text" placeholder="z. B. Frühling" value="${esc(p.label)}" aria-label="Bezeichnung">`)
+    label.onchange = () => { p.label = label.value; render() }
+    panel.append(row('<span class="new">Bezeichnung</span>', label))
+    const fields = dateFields(p.date, (d) => { p.date = d; render() })
+    panel.append(row('Datum', fields, true))
+    if (p.date) panel.append(row('', el(`<span class="muted">${esc(formatDate(p.date))} ${infoIcon(p.date)}</span>`)))
+    panel.append(row('Reihenfolge', el(`<span class="muted">${current + 1} von ${points.length}</span>`)))
+    hints.filter((h) => h.at === current).forEach((h) => panel.append(el(`<div class="hint"><b>Hinweis:</b> ${esc(h.text)}</div>`)))
+    const problem = calendarProblem(p.date)
+    if (problem) panel.append(el(`<div class="hint"><b>Hinweis:</b> Das Datum passt nicht zum Kalender. ${esc(problem)}</div>`))
+  } else {
+    const q = persons[selected.i]
+    panel.append(el(`<div class="ph"><h3>${esc(q.name)}</h3><span class="badge">Person</span></div>`))
+    panel.append(row('Existiert', el('<span class="muted">immer</span>')))
+    panel.append(row('Geboren', dateFields(q.born, (d) => { q.born = d; render() }), true))
+    if (q.born) panel.append(row('', el(`<span class="muted">${esc(formatDate(q.born))} ${infoIcon(q.born)}</span>`)))
+    const a = age(q.born, p.date)
+    if (a) panel.append(row('Alter', el(`<span>${esc(a)} <span class="muted">· zu „${esc(p.name)}“</span></span>`), true))
+    else panel.append(el(`<div class="muted">${q.born ? 'Der Zeitpunkt hat kein Datum, daher kein Alter.' : 'Ohne Geburtsdatum gibt es kein Alter.'}</div>`))
+    const problem = calendarProblem(q.born)
+    if (problem) panel.append(el(`<div class="hint"><b>Hinweis:</b> Das Geburtsdatum passt nicht zum Kalender. ${esc(problem)}</div>`))
+  }
+}
+
+// ---------- Kalender-Seite ----------
+let toastTimer
+function toast(text) {
+  const t = document.getElementById('toast')
+  t.textContent = text
+  t.classList.remove('hidden')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 4000)
+}
+const remap = (key, map) => allDates().forEach((d) => { if (d[key] !== undefined && map[d[key]] !== undefined) d[key] = map[d[key]] })
+const swap = (list, i, j, key) => { [list[i], list[j]] = [list[j], list[i]]; remap(key, { [i + 1]: j + 1, [j + 1]: i + 1 }) }
+const uses = (key, k) => allDates().filter((d) => d[key] === k).length
+
+function actions(i, length, onMove, onDelete) {
+  const td = el('<td class="acts"></td>')
+  const up = el(`<button class="ib" aria-label="nach oben" ${i === 0 ? 'disabled' : ''}>↑</button>`)
+  const down = el(`<button class="ib" aria-label="nach unten" ${i === length - 1 ? 'disabled' : ''}>↓</button>`)
+  const del = el('<button class="ib del" aria-label="entfernen">✕</button>')
+  up.onclick = () => onMove(i - 1)
+  down.onclick = () => onMove(i + 1)
+  del.onclick = onDelete
+  td.append(up, down, del)
+  return td
+}
+function textInput(value, label, onChange) {
+  const input = el(`<input type="text" value="${esc(value)}" aria-label="${label}">`)
+  input.onchange = () => onChange(input.value)
+  return input
+}
+function numberInput(value, label, onChange, min = 1) {
+  const input = el(`<input type="number" min="${min}" value="${value}" aria-label="${label}">`)
+  input.onchange = () => { const v = Math.max(min, +input.value || min); onChange(v) }
+  return input
+}
+
+function renderCal() {
+  const empty = !cal.months.length && !cal.weekdays.length && !cal.eras.length
+  document.getElementById('calEmpty').classList.toggle('hidden', !empty)
+
+  const months = document.getElementById('months')
+  months.replaceChildren(...cal.months.map((m, i) => {
+    const tr = el(`<tr><td class="n">${i + 1}</td><td></td><td></td></tr>`)
+    tr.children[1].append(textInput(m.name, 'Name des Monats', (v) => { m.name = v; render() }))
+    tr.children[2].append(numberInput(m.days, 'Tage', (v) => { m.days = v; render() }))
+    tr.append(actions(i, cal.months.length, (j) => { swap(cal.months, i, j, 'month'); render() }, () => {
+      const n = uses('month', i + 1)
+      if (n) return toast(`${m.name} wird von ${n} ${n === 1 ? 'Datum' : 'Daten'} genutzt und lässt sich nicht entfernen.`)
+      cal.months.splice(i, 1)
+      remap('month', Object.fromEntries(cal.months.map((_, k) => [k + 2 > i + 1 ? k + 2 : k + 1, k + 1])))
+      render()
+    }))
+    return tr
+  }))
+  if (!cal.months.length) months.append(el('<tr><td colspan="4" class="muted">Keine Monate, Daten haben nur ein Jahr.</td></tr>'))
+
+  const weekdays = document.getElementById('weekdays')
+  weekdays.replaceChildren(...cal.weekdays.map((w, i) => {
+    const tr = el(`<tr><td class="n">${i + 1}</td><td></td></tr>`)
+    tr.children[1].append(textInput(w, 'Name des Wochentags', (v) => { cal.weekdays[i] = v; render() }))
+    tr.append(actions(i, cal.weekdays.length, (j) => { [cal.weekdays[i], cal.weekdays[j]] = [cal.weekdays[j], cal.weekdays[i]]; render() }, () => {
+      cal.weekdays.splice(i, 1)
+      cal.firstWeekday = Math.min(cal.firstWeekday, Math.max(0, cal.weekdays.length - 1))
+      render()
+    }))
+    return tr
+  }))
+  if (!cal.weekdays.length) weekdays.append(el('<tr><td class="muted">Keine Wochentage.</td></tr>'))
+  const anchor = document.getElementById('anchor')
+  anchor.replaceChildren(...cal.weekdays.map((w, k) => new Option(w, k)))
+  anchor.value = cal.firstWeekday
+  anchor.onchange = () => { cal.firstWeekday = +anchor.value; render() }
+  document.getElementById('anchorRow').classList.toggle('hidden', !cal.weekdays.length)
+  document.getElementById('anchorLabel').textContent = cal.eras.length ? `Erster Tag von Jahr 1 ${cal.eras[0].short} ist ein` : 'Erster Tag von Jahr 1 ist ein'
+
+  const eras = document.getElementById('eras')
+  const before = el('<tr><td class="n">0</td><td></td><td></td><td class="open">rückwärts gezählt</td><td></td></tr>')
+  before.children[1].append(textInput(cal.before.name, 'Name vor der ersten Zeitrechnung', (v) => { cal.before.name = v; render() }))
+  before.children[2].append(textInput(cal.before.short, 'Kürzel vor der ersten Zeitrechnung', (v) => { cal.before.short = v; render() }))
+  eras.replaceChildren(...(cal.eras.length ? [before] : []), ...cal.eras.map((e, i) => {
+    const last = i === cal.eras.length - 1
+    const tr = el(`<tr><td class="n">${i + 1}</td><td></td><td></td><td></td></tr>`)
+    tr.children[1].append(textInput(e.name, 'Name der Zeitrechnung', (v) => { e.name = v; render() }))
+    tr.children[2].append(textInput(e.short, 'Kürzel', (v) => { e.short = v; render() }))
+    if (last) tr.children[3].append(el('<span class="open">läuft noch</span>'))
+    else tr.children[3].append(numberInput(e.years, 'Jahre', (v) => { e.years = v; render() }))
+    tr.append(actions(i, cal.eras.length, (j) => {
+      swap(cal.eras, i, j, 'era')
+      const lastEra = cal.eras.at(-1)
+      if (lastEra.years) { cal.eras.forEach((x) => { if (!x.years) x.years = 100 }); delete lastEra.years }
+      render()
+    }, () => {
+      if (cal.eras.length === 1) {
+        allDates().forEach((d) => { d.year = absYear(d); delete d.era })
+        cal.eras = []
+        return render()
+      }
+      const n = uses('era', i + 1)
+      if (n) return toast(`${e.name} wird von ${n} ${n === 1 ? 'Datum' : 'Daten'} genutzt und lässt sich nicht entfernen.`)
+      cal.eras.splice(i, 1)
+      remap('era', Object.fromEntries(cal.eras.map((_, k) => [k + 2 > i + 1 ? k + 2 : k + 1, k + 1])))
+      if (cal.eras.length) delete cal.eras.at(-1).years
+      render()
+    }))
+    return tr
+  }))
+  if (!cal.eras.length) eras.append(el('<tr><td colspan="5" class="muted">Keine Zeitrechnungen, Jahre sind einfache Zahlen (auch 0 und negativ).</td></tr>'))
+
+  const p = points[0]
+  const preview = document.getElementById('preview')
+  const lines = [
+    ['Jahr', cal.months.length ? `${yearDays()} Tage in ${cal.months.length} Monaten` : 'nur Jahreszahlen'],
+    ['Woche', cal.weekdays.length ? `${cal.weekdays.length} Tage` : '—'],
+    ['Zeitpunkt 1', `${esc(formatDate(p.date) || 'ohne Datum')} ${infoIcon(p.date)}`],
+    ['Daten im Buch', `${allDates().length}`],
+  ]
+  preview.innerHTML = lines.map(([a, b]) => `<span class="lab">${a}</span><span>${b}</span>`).join('')
+}
+
+document.getElementById('addMonth').onclick = () => { cal.months.push({ name: `Monat ${cal.months.length + 1}`, days: 30 }); render() }
+document.getElementById('addWeekday').onclick = () => { cal.weekdays.push(`Tag ${cal.weekdays.length + 1}`); render() }
+document.getElementById('addEra').onclick = () => {
+  if (!cal.eras.length) {
+    cal.eras.push({ name: 'Erste Zeitrechnung', short: 'E.' })
+    allDates().forEach((d) => { if (d.year >= 1) d.era = 1; else { d.era = 0; d.year = 1 - d.year } })
+  } else {
+    const k = cal.eras.length
+    const used = allDates().filter((d) => d.era === k).map((d) => d.year)
+    cal.eras.at(-1).years = used.length ? Math.max(...used) : 100
+    cal.eras.push({ name: `Zeitrechnung ${k + 1}`, short: `${k + 1}.` })
+  }
+  render()
+}
+
+function render() { renderMain(); renderCal() }
+function go(page) {
+  document.getElementById('main').classList.toggle('hidden', page !== 'main')
+  document.getElementById('cal').classList.toggle('hidden', page !== 'cal')
+  document.querySelectorAll('.proto [data-go]').forEach((b) => b.classList.toggle('on', b.dataset.go === page))
+}
+document.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => go(b.dataset.go)))
+document.getElementById('withCal').onclick = () => reset(true)
+document.getElementById('noCal').onclick = () => reset(false)
+reset(true)
+go('main')
+</script>
+</body>
+</html>

@@ -49,7 +49,7 @@ export const changes = (copy: WorkingCopy) => [...diff(committed(copy), copy.fil
 /** Größe aller noch nicht gepushten neuen Bilder in Bytes (Festlegung 17 der Speicherung) */
 export const unpushedImageSize = (copy: WorkingCopy) => Object.entries(currentImages(copy)).reduce((sum, [path, ref]) => (copy.images[path]?.sha === ref.sha ? sum : sum + ref.size), 0)
 
-/** Lädt den Arbeitsbranch neu; richtet leere Repos ein und setzt den Branch nach einem Merge auf den Standardbranch */
+/** Lädt den Arbeitsbranch neu; richtet leere Repos und leere Buchordner ein und setzt den Branch nach einem Merge auf den Standardbranch */
 export async function load(token: string, repo: string): Promise<WorkingCopy> {
   const gh = new GitHub(token, repo)
   const [login, info, previous] = await Promise.all([gh.login(), gh.repository(), copies.get(repo)])
@@ -57,12 +57,21 @@ export async function load(token: string, repo: string): Promise<WorkingCopy> {
   let branch = previous?.branch ?? `${login}/arbeit`
 
   let main = await gh.branchSha(info.default_branch)
+  const meta = JSON.stringify({ format: FORMAT, title: repo.split('/').at(-1) }, null, 2) + '\n'
+  const [first, content] = firstTimePoint({})
   if (!main) {
-    const title = repo.split('/')[1]
-    await gh.createFirstFile('booktime.json', JSON.stringify({ format: FORMAT, title }, null, 2) + '\n', 'BookTime einrichten')
-    const [path, content] = firstTimePoint({})
-    main = await gh.commit((await gh.branchSha(info.default_branch))!, 'Ersten Zeitpunkt anlegen', { [path]: { content } })
+    await gh.createFirstFile('booktime.json', meta, 'BookTime einrichten')
+    main = await gh.commit((await gh.branchSha(info.default_branch))!, 'Ersten Zeitpunkt anlegen', { [first]: { content } })
     await gh.setBranch(info.default_branch, main, 'update')
+  } else if (gh.path) {
+    const folder = await gh.tree(main)
+    if (folder.length && !folder.some((e) => e.path === 'booktime.json')) throw new Error(`Im Ordner ${gh.path} liegt kein Buch. Bitte einen leeren oder neuen Ordner angeben.`)
+    if (!folder.length) {
+      main = await gh.commit(main, 'BookTime einrichten', { 'booktime.json': { content: meta }, [first]: { content } })
+      await gh.setBranch(info.default_branch, main, 'update').catch((error: Error) => {
+        throw new Error(`${error.message} Den Ordner bitte selbst mit einer booktime.json anlegen, Inhalt {}.`)
+      })
+    }
   }
   let head = await gh.branchSha(branch)
   if (!head) {
