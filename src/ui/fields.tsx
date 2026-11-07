@@ -82,7 +82,9 @@ export function Inline({ field, value, label, onCommit, placeholder = 'leer', mu
       placeholder,
       autoFocus: true,
       onChange: (e: { currentTarget: { value: string } }) => setDraft(e.currentTarget.value),
-      onBlur: () => finish(true),
+      // Mantines Menü fokussiert verspätet seinen Platzhalter, auch wenn es schon geschlossen ist; das Feld bleibt dann offen
+      onBlur: (e: { currentTarget: HTMLElement; relatedTarget: EventTarget | null }) =>
+        e.relatedTarget instanceof Element && e.relatedTarget.closest('[data-menu-dropdown]') ? e.currentTarget.focus() : finish(true),
       onKeyDown,
       onFocus: (e: { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => {
         done.current = false
