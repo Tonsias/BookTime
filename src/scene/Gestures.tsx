@@ -19,6 +19,8 @@ interface GesturesProps {
   current: number
   scope: Scope
   enabled: boolean
+  /** Ausgewähltes Element; sein Ring hat beim Anfassen Vorrang */
+  selected?: string
   projector: RefObject<Projector | null>
   grab: MutableRefObject<Grab | null>
   children: ReactNode
@@ -80,7 +82,7 @@ export function Gestures(props: GesturesProps) {
     const onDown = (e: PointerEvent) => {
       if (!latest.current.enabled || e.button !== 0) return
       const point = net(e.clientX, e.clientY)
-      const source = point && hitAt(p().book, p().layout, p().current, point, 'ring')
+      const source = point && hitAt(p().book, p().layout, p().current, point, 'ring', undefined, p().selected)
       if (!source) return
       // Im Erfassen anhalten: die Kamera soll sich nicht drehen, wenn man ein Element anfasst
       e.stopPropagation()
@@ -129,6 +131,10 @@ export function Gestures(props: GesturesProps) {
       drag.current = null
       setOverlay(null)
       if (!d) return
+      // Der Browser schickt nach dem Loslassen noch einen Klick; der darf in der Szene nichts anderes auswählen
+      const swallow = (click: MouseEvent) => click.stopPropagation()
+      box.current?.addEventListener('click', swallow, { capture: true, once: true })
+      setTimeout(() => box.current?.removeEventListener('click', swallow, { capture: true }))
       const { onSelect, onPlace, onDrop } = p()
       if (!d.moved) {
         if (!d.tray) onSelect(d.source)

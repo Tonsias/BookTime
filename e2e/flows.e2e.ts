@@ -128,7 +128,7 @@ test('Selbst bearbeiten öffnet den betroffenen Fakt', async ({ page }) => {
   await search(page, 'Abt Corvin')
   await panel(page).getByRole('slider', { name: 'Existenz: Ende' }).focus()
   await page.keyboard.press('ArrowLeft')
-  await page.getByRole('button', { name: /Hinweise auflösen/ }).click()
+  await page.getByRole('button', { name: /Hinweise? auflösen/ }).click()
   await page.getByRole('button', { name: 'Selbst bearbeiten' }).click()
   await expect(page.getByRole('dialog', { name: 'Hinweis auflösen' })).toBeHidden()
   await expect(panel(page).locator('.fact.open')).toHaveCount(1)

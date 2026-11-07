@@ -46,8 +46,9 @@ export function computeLayout(book: Book, count: number): Layout {
 
   const facts = slices.map((i) => factsAt(book, i))
   const persons = new Map<string, Track>()
-  book.persons.forEach((person, n) => {
-    // feste Ablage um den Ort, damit Stränge nur bei echten Änderungen springen
+  const byId = [...book.persons].sort((a, b) => a.id.localeCompare(b.id))
+  byId.forEach((person, n) => {
+    // Feste Ablage um den Ort nach ID-Reihenfolge (die Liste ändert sich beim Neuladen), Stränge springen nur bei echten Änderungen
     const angle = n * GOLDEN_ANGLE
     persons.set(
       person.id,

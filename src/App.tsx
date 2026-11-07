@@ -270,6 +270,7 @@ function BookView({ active }: { active: ActiveBook }) {
           current={i}
           scope={scope}
           enabled={view !== 'zeit'}
+          selected={selection?.id}
           projector={projector}
           grab={grab}
           onSelect={setSelection}
@@ -327,9 +328,9 @@ function BookView({ active }: { active: ActiveBook }) {
             opened
             onClose={() => setRelationMenu(null)}
             title={`${name(relationMenu.a)} → ${name(relationMenu.c)}`}
-            placeholder="Beziehungsart suchen oder neu anlegen …"
+            placeholder="Art suchen oder anlegen …"
             options={book.relationTypes.map((t) => ({ id: t.id, label: t.name, color: t.color, hint: `${name(relationMenu.a)} ${t.directed ? '→' : '↔'} ${name(relationMenu.c)}` }))}
-            onPick={(type) => change(`Beziehung ${name(relationMenu.a)} → ${name(relationMenu.c)}`, (d) => connect(d, relationMenu.a, relationMenu.c, type, i, scope))}
+            onPick={(type) => change(`Beziehung ${name(relationMenu.a)} → ${name(relationMenu.c)}`, (d) => connect(d, relationMenu.a, relationMenu.c, type, i, scope)) && setSelection({ kind: 'person', id: relationMenu.a })}
             creates={[{ label: (q) => `Neue Art „${q}“`, run: (q) => change(`Beziehung ${name(relationMenu.a)} → ${name(relationMenu.c)}`, (d) => connect(d, relationMenu.a, relationMenu.c, create(d, 'relationType', i, q), i, scope)) }]}
             target={<div className="menu-anchor" style={{ left: relationMenu.x, top: relationMenu.y }} />}
           />

@@ -15,11 +15,17 @@ export function Markdown({ children, dimmed }: { children: string; dimmed?: bool
   )
 }
 
-// Tab übernimmt und öffnet das nächste Feld derselben Ansicht
+const FOCUSABLE = 'button:not([disabled]), [data-field], input:not([type=hidden]):not([disabled]), textarea, [role=slider], [tabindex="0"]'
+
+// Tab übernimmt und geht zum nächsten Bedienelement derselben Fläche; ein Textfeld öffnet sich dabei gleich
 function openNext(field: string, back: boolean) {
-  const fields = [...document.querySelectorAll<HTMLElement>('[data-field]')]
-  const k = fields.findIndex((f) => f.dataset.field === field)
-  fields[k + (back ? -1 : 1)]?.click()
+  const current = [...document.querySelectorAll<HTMLElement>('[data-field]')].find((el) => el.dataset.field === field)
+  if (!current) return
+  const area = current.closest('[role=complementary], [role=dialog], .overlay') ?? document.body
+  const all = [...area.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest('[hidden], [aria-hidden=true], [style*="display: none"]'))
+  const next = all[all.indexOf(current) + (back ? -1 : 1)]
+  if (next?.dataset.field) next.click()
+  else (next ?? current).focus()
 }
 
 interface InlineProps {
@@ -78,6 +84,7 @@ export function Inline({ field, value, label, onCommit, placeholder = 'leer', mu
       onBlur: () => finish(true),
       onKeyDown,
       onFocus: (e: { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => {
+        done.current = false
         const length = e.currentTarget.value.length
         e.currentTarget.setSelectionRange(requested ? 0 : length, length)
       },

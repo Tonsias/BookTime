@@ -24,8 +24,9 @@ export function positionOf(book: Book, layout: Layout, i: number, target: Target
 /**
  * Element unter einem Netzpunkt (Festlegung 58): erst Personen, dann Events, dann Orte.
  * `ring` trifft Orte nur am Ring (zum Anfassen, damit die Kamera im Inneren frei bleibt), `inside` überall im Ring (als Ziel).
+ * Liegen Ringe übereinander, gewinnt `prefer` (der ausgewählte Ort), sonst der innerste.
  */
-export function hitAt(book: Book, layout: Layout, i: number, point: NetPos, ring: 'ring' | 'inside', skip?: string): Target | undefined {
+export function hitAt(book: Book, layout: Layout, i: number, point: NetPos, ring: 'ring' | 'inside', skip?: string, prefer?: string): Target | undefined {
   const near = (kind: Target['kind'], ids: string[]) =>
     ids
       .map((id) => ({ kind, id, pos: positionOf(book, layout, i, { kind, id }) }))
@@ -37,7 +38,7 @@ export function hitAt(book: Book, layout: Layout, i: number, point: NetPos, ring
     .filter((p) => p.id !== skip)
     .map((p) => ({ p, pos: layout.places.get(p.id)?.[i], r: ringRadius(p) }))
     .filter(({ pos, r }) => pos && (ring === 'ring' ? Math.abs(distance(pos, point) - r) < BAND : distance(pos, point) < r))
-    .sort((a, b) => a.r - b.r)[0]
+    .sort((a, b) => Number(b.p.id === prefer) - Number(a.p.id === prefer) || a.r - b.r)[0]
   return place && { kind: 'place', id: place.p.id }
 }
 

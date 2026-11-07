@@ -128,8 +128,11 @@ function HistoryText({ fact, me, type }: { fact: Fact; me: string; type?: string
       return <Text span size="sm">{fact.actor === me ? <>bei <Ref id={fact.event} /></> : <Ref id={fact.actor} />}</Text>
     case 'membership':
       return <Text span size="sm">{fact.person === me ? <>in <Ref id={fact.group} /></> : <Ref id={fact.person} />}</Text>
-    case 'relation':
-      return <Text span size="sm">{other(fact.from, fact.to)} {book.relationTypes.find((t) => t.id === type)?.name}</Text>
+    case 'relation': {
+      const kind = book.relationTypes.find((t) => t.id === type)
+      const arrow = !kind?.directed ? '↔' : fact.from === me ? '→' : '←'
+      return <Text span size="sm">{arrow} {other(fact.from, fact.to)} {kind?.name}</Text>
+    }
   }
 }
 

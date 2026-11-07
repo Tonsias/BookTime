@@ -38,7 +38,7 @@ interface ToolbarProps {
 export function Toolbar(props: ToolbarProps) {
   const { book, hints, select, openHint } = useUi()
   const { repo, status, changes } = props
-  const pending = changes ? `${changes} Änderungen` : 'Keine Änderungen'
+  const pending = changes ? `${changes} ${changes === 1 ? 'Änderung' : 'Änderungen'}` : 'Keine Änderungen'
   return (
     <Paper className="overlay toolbar" p="md" radius="md" withBorder shadow="lg">
       <Stack gap="sm">
@@ -70,7 +70,7 @@ export function Toolbar(props: ToolbarProps) {
             )}
             {hints.length > 0 && (
               <Anchor component="button" type="button" size="xs" c="yellow" onClick={() => openHint()}>
-                {hints.length} Hinweise auflösen
+                {hints.length} {hints.length === 1 ? 'Hinweis' : 'Hinweise'} auflösen
               </Anchor>
             )}
             {props.errors > 0 && (
@@ -133,7 +133,7 @@ export function Toolbar(props: ToolbarProps) {
 
 function NewMenu({ newOpen, onNewOpen, onNew }: ToolbarProps) {
   return (
-    <Menu opened={newOpen} onChange={onNewOpen} position="bottom-end" shadow="lg">
+    <Menu opened={newOpen} onChange={onNewOpen} position="bottom-end" shadow="lg" returnFocus={false}>
       <Menu.Target>
         <Button aria-label="Neu anlegen (N)">+ Neu</Button>
       </Menu.Target>
@@ -179,7 +179,10 @@ export function Timebar({ onScope, onAdd }: { onScope: (scope: Scope) => void; o
           ml="auto"
           size="xs"
           value={scope}
-          onChange={(v) => onScope(v as Scope)}
+          onChange={(v) => {
+            onScope(v as Scope)
+            ;(document.activeElement as HTMLElement | null)?.blur()
+          }}
           aria-label="Änderungen gelten"
           data={[
             { value: 'hier', label: 'Ab hier' },

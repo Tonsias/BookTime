@@ -30,6 +30,14 @@ describe('Treffer im Netz', () => {
     expect(hitAt(book, layout, 0, [0, -1.5], 'inside')).toEqual({ kind: 'place', id: 'x' })
   })
 
+  it('gibt bei übereinanderliegenden Ringen dem ausgewählten Ort Vorrang', () => {
+    const inner = { ...named('z'), radius: 3, phases: [{ id: 'zl', timing: {}, x: 0, y: 0, images: [] }] }
+    const both = { ...book, places: [...book.places, inner] }
+    const twin = computeLayout(both, 1)
+    expect(hitAt(both, twin, 0, [0, -3], 'ring')).toEqual({ kind: 'place', id: 'x' })
+    expect(hitAt(both, twin, 0, [0, -3], 'ring', undefined, 'z')).toEqual({ kind: 'place', id: 'z' })
+  })
+
   it('überspringt das gezogene Element selbst', () => {
     expect(hitAt(book, layout, 0, a, 'inside', 'a')).toEqual({ kind: 'place', id: 'x' })
   })

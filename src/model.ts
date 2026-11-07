@@ -235,7 +235,7 @@ export function factLabel(book: Book, fact: Fact, phase?: RelationPhase): string
       return `Mitgliedschaft von ${n(fact.person)} in ${n(fact.group)}`
     case 'relation': {
       const type = book.relationTypes.find((t) => t.id === phase?.type)
-      return `Beziehung ${n(fact.from)} – ${n(fact.to)}${type ? ` (${type.name})` : ''}`
+      return `Beziehung ${n(fact.from)} ${type?.directed ? '→' : '–'} ${n(fact.to)}${type ? ` (${type.name})` : ''}`
     }
   }
 }

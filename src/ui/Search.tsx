@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Spotlight, type SpotlightActionGroupData } from '@mantine/spotlight'
+import { useEffect, useState } from 'react'
+import { Spotlight, spotlight, type SpotlightActionGroupData } from '@mantine/spotlight'
 import type { NewKind } from '../edit/ops'
 import { bounds, elementColor, type ElementKind } from '../model'
 import { useUi } from './context'
@@ -15,6 +15,31 @@ const CREATE: [NewKind, string][] = [
 export function Search({ onCreate }: { onCreate: (kind: NewKind, name: string) => void }) {
   const { book, points, select, jump } = useUi()
   const [query, setQuery] = useState('')
+
+  // Kurzbefehl selbst behandeln: Mantine fokussiert das Suchfeld erst nach dem Öffnen, Getipptes bis dahin wird gepuffert
+  useEffect(() => {
+    let buffering = false
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable]')
+      const input = document.querySelector<HTMLInputElement>('.mantine-Spotlight-search')
+      if (!buffering && !typing && ((e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey)) || e.key === '/')) {
+        e.preventDefault()
+        buffering = true
+        spotlight.open()
+      } else if (buffering && e.target !== input && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        setQuery((q) => q + e.key)
+        input?.focus()
+      }
+    }
+    const stop = () => (buffering = false)
+    addEventListener('keydown', onKey, true)
+    addEventListener('booktime-search-closed', stop)
+    return () => {
+      removeEventListener('keydown', onKey, true)
+      removeEventListener('booktime-search-closed', stop)
+    }
+  }, [])
   const dot = (color: string) => <span className="dot" style={{ background: color }} />
   const group = (kind: ElementKind, name: string, items: { id: string; label: string; description: string }[], onPick?: (id: string) => void): SpotlightActionGroupData => ({
     group: name,
@@ -69,7 +94,11 @@ export function Search({ onCreate }: { onCreate: (kind: NewKind, name: string) =
       actions={actions}
       query={query}
       onQueryChange={setQuery}
-      shortcut={['mod + K', '/']}
+      shortcut={null}
+      onSpotlightClose={() => {
+        setQuery('')
+        dispatchEvent(new Event('booktime-search-closed'))
+      }}
       nothingFound="Nichts gefunden"
       highlightQuery
       searchProps={{ placeholder: 'Person, Gruppe, Ort, Event, Zeitpunkt … oder neu anlegen' }}
