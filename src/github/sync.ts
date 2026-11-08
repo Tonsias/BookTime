@@ -105,6 +105,7 @@ export async function load(token: string, repo: string): Promise<WorkingCopy> {
     commits: [],
     repoSize: info.size,
     pullUrl: latest?.state === 'open' ? latest.html_url : undefined,
+    ahead: head !== main && (await gh.ahead(info.default_branch, branch)),
   }
   await copies.put(copy)
   return copy
@@ -130,6 +131,7 @@ const finish = async (copy: WorkingCopy, branch: string, head: string) => {
     commits: [],
     pushing: undefined,
     pullUrl: branch === copy.branch ? copy.pullUrl : undefined,
+    ahead: true,
   }
   await copies.put(next)
   return next

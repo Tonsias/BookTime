@@ -96,7 +96,7 @@ export function GitHubPage() {
                   <Table.Td>{active === repo && <Badge>angezeigt</Badge>}</Table.Td>
                   <Table.Td>
                     <Group gap="xs">
-                      <Button size="xs" variant="default" onClick={() => setSelected(repo)}>
+                      <Button size="xs" variant="default" onClick={() => (setSelected(repo), show(repo))}>
                         Auswählen
                       </Button>
                       <Button
@@ -130,6 +130,7 @@ export function GitHubPage() {
               books.set(next)
               setList(next)
               setSelected(repo)
+              show(repo)
             }}
           />
         </Section>
@@ -139,8 +140,6 @@ export function GitHubPage() {
             copy={copy?.repo === selected ? copy : undefined}
             token={key}
             busy={busy}
-            shown={active === selected}
-            onShow={() => show(selected)}
             run={run}
             guard={guard}
           />
@@ -216,13 +215,11 @@ interface BookSectionProps {
   copy?: WorkingCopy
   token: string
   busy: boolean
-  shown: boolean
-  onShow: () => void
   run: (action: () => Promise<WorkingCopy | void>) => void
   guard: (copy: WorkingCopy | undefined, then: () => Promise<WorkingCopy | void>) => void
 }
 
-function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }: BookSectionProps) {
+function BookSection({ repo, copy, token: key, busy, run, guard }: BookSectionProps) {
   const [message, setMessage] = useState('')
   const reload = () => guard(copy, () => load(key, repo))
   const checked = useMemo(() => {
@@ -261,14 +258,9 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }
             {Object.keys(copy.files).length} Text, {Object.keys(currentImages(copy)).length} Bilder
           </Info>
         </Group>
-        <Group>
-          <Button variant="default" onClick={reload} loading={busy}>
-            Neu laden
-          </Button>
-          <Button variant="default" onClick={onShow} disabled={shown}>
-            {shown ? 'Wird angezeigt' : 'In der Buchansicht anzeigen'}
-          </Button>
-        </Group>
+        <Button variant="default" w="fit-content" onClick={reload} loading={busy}>
+          Neu laden
+        </Button>
 
         {'tooNew' in checked && (
           <Alert color="red" title="Buch ist neuer als diese BookTime-Version">
@@ -355,9 +347,16 @@ function BookSection({ repo, copy, token: key, busy, shown, onShow, run, guard }
               {copy.pullUrl}
             </Anchor>
           ) : (
-            <Button variant="default" disabled={busy || copy.commits.length > 0} onClick={() => run(() => openPull(key, copy))}>
-              Pull Request {copy.branch} → {copy.defaultBranch} erstellen
-            </Button>
+            <>
+              <Button variant="default" disabled={busy || copy.commits.length > 0 || !copy.ahead} onClick={() => run(() => openPull(key, copy))}>
+                Pull Request {copy.branch} → {copy.defaultBranch} erstellen
+              </Button>
+              {!copy.ahead && (
+                <Text size="sm" c="dimmed" mt={4}>
+                  Erst möglich, wenn {copy.branch} gepushte Änderungen hat, die in {copy.defaultBranch} fehlen.
+                </Text>
+              )}
+            </>
           )}
         </div>
       </Stack>

@@ -29,6 +29,8 @@ export interface WorkingCopy {
   commits: LocalCommit[]
   repoSize: number
   pullUrl?: string
+  /** Arbeitsbranch hat Commits, die im Standardbranch fehlen; erst dann ist ein Pull Request möglich */
+  ahead?: boolean
   pushing?: { branch: string; head: string }
 }
 

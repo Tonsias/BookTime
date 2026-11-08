@@ -148,6 +148,11 @@ export class GitHub {
     )
   }
 
+  /** Ob ein Branch Commits hat, die im Standardbranch fehlen */
+  async ahead(base: string, branch: string) {
+    return (await this.request<{ ahead_by: number }>(`/{repo}/compare/${base}...${branch}`)).ahead_by > 0
+  }
+
   /** Erstellt einen Pull Request und liefert dessen Adresse */
   async createPull(branch: string, base: string, title: string) {
     return (await this.request<{ html_url: string }>('/{repo}/pulls', { method: 'POST', body: { head: branch, base, title } })).html_url

@@ -106,6 +106,11 @@ class FakeGitHub {
       this.refs.set('main', this.addCommit({ [content]: atob(body.content as string) }, []))
       return [201, {}]
     }
+    const compare = /^\/compare\/([^.]+)\.\.\.(.+)$/.exec(route)
+    if (compare) {
+      const behind = new Set(this.ancestors(this.refs.get(compare[1]!)!))
+      return [200, { ahead_by: this.ancestors(this.refs.get(compare[2]!)!).filter((c) => !behind.has(c)).length }]
+    }
     if (route.startsWith('/pulls?')) {
       const head = decodeURIComponent(/head=o:([^&]+)/.exec(route)![1]!)
       return [200, this.pulls.filter((p) => p.head === head).reverse().map((p) => ({ ...p, head: { sha: p.sha } }))]
@@ -231,6 +236,21 @@ describe('GitHub-Abläufe', () => {
     it('lehnt einen Ordner mit fremden Dateien ohne booktime.json ab', async () => {
       await expect(load('token', 'o/buch/src')).rejects.toThrow('Im Ordner src liegt kein Buch')
     })
+  })
+
+  it('erlaubt einen Pull Request erst, wenn der Arbeitsbranch main voraus ist', async () => {
+    let copy = await load('token', 'o/buch')
+    expect(copy.ahead).toBe(false)
+    copy = await push('token', await commitLocal({ ...copy, files: { ...copy.files, 'booktime.note.md': 'Neu\n' } }, 'Notiz'))
+    expect(copy.ahead).toBe(true)
+    expect((await load('token', 'o/buch')).ahead).toBe(true)
+  })
+
+  it('kein Pull Request, wenn nur main weiter ist', async () => {
+    await load('token', 'o/buch')
+    const main = github.refs.get('main')!
+    github.refs.set('main', github.addCommit({ ...github.files(main), 'booktime.note.md': 'Von woanders\n' }, [main]))
+    expect((await load('token', 'o/buch')).ahead).toBe(false)
   })
 
   it('schließt einen abgebrochenen Push nur noch ab', async () => {
