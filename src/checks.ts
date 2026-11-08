@@ -1,5 +1,5 @@
 import { calendarMismatch, calendarOf, compareDates, dateError, formatDate } from './calendar'
-import { bounds, covers, factLabel, factTiming, findElement, involvedIds, placeChain, spanLabel, timeline, type Book, type Fact, type Image, type Place, type Timing } from './model'
+import { bounds, covers, factLabel, factTiming, findElement, involvedIds, layerAt, onLayer, placeChain, spanLabel, timeline, worldPosition, type Book, type Fact, type Image, type Place, type Timing } from './model'
 
 /** Art eines Hinweises; mit den beteiligten IDs ein stabiler Schlüssel */
 export type HintRule =
@@ -13,6 +13,7 @@ export type HintRule =
   | 'place-gap'
   | 'parent-missing'
   | 'outside-radius'
+  | 'outside-layer'
   | 'image-time'
   | 'image-missing'
   | 'date-order'
@@ -216,6 +217,15 @@ function placeHints(book: Book, place: Place, add: Add) {
     return phase && radius !== undefined && Math.hypot(phase.x, phase.y) > radius
   })
   if (beyond !== undefined) add('outside-radius', [phaseAt(beyond)!.id], [place.id, parentAt(beyond)!.id], beyond, `${place.name} liegt außerhalb des Radius von ${parentAt(beyond)!.name}`)
+  if (!book.timePoints.some((t) => t.background)) return
+  const reported = new Set<string>()
+  for (const i of life) {
+    const phase = phaseAt(i)
+    const pos = worldPosition(book, place.id, i)
+    if (!phase || !pos || reported.has(phase.id) || onLayer(layerAt(book, i), pos.x, pos.y)) continue
+    reported.add(phase.id)
+    add('outside-layer', [phase.id], [place.id], i, `${place.name} liegt auf ${i + 1}. ${timeline(book)[i]!.name} außerhalb der Ebene`)
+  }
 }
 
 function imageHints(book: Book, add: Add) {

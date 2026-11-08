@@ -1,6 +1,6 @@
 # Vorschlag: Hintergrundbild für Zeitpunkte
 
-Status: **akzeptiert (2026-10-25)**. Erweitert `docs/2026-10-datenmodell.md` und `docs/2026-10-speicherung-github.md`.
+Status: **akzeptiert (2026-10-25)**. Festlegung 4 ist durch [2026-11-ebene-nach-bild.md](2026-11-ebene-nach-bild.md) ergänzt: Die Zeitebene hat die Form des Bildes, die Höhe steht als `height` in der Datei. Erweitert `docs/2026-10-datenmodell.md` und `docs/2026-10-speicherung-github.md`.
 
 Ziel: Ein Zeitpunkt kann ein Hintergrundbild halten, zum Beispiel eine Weltkarte. Die Karte liegt in der
 3D-Szene unter dem Netz und passt zu den Koordinaten der Orte.

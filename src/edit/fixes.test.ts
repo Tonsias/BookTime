@@ -41,6 +41,10 @@ const CASES: Record<HintRule, Book> = {
   'place-gap': base({ places: [place('a', { phases: [{ id: 'l1', timing: { to: 't2' }, x: 0, y: 0, images: [] }] }), place('b')] }),
   'parent-missing': base({ places: [place('a', { existence: { from: 't3' } }), place('b', { phases: [{ id: 'l', timing: {}, parent: 'a', x: 1, y: 0, images: [] }] })] }),
   'outside-radius': base({ places: [place('a', { radius: 2 }), place('b', { phases: [{ id: 'l', timing: {}, parent: 'a', x: 5, y: 0, images: [] }] })] }),
+  'outside-layer': base({
+    timePoints: [{ ...point('t1', 1), background: { id: 'g', file: 'images/x-xxxx.png', x: 0, y: 0, width: 10, height: 6 } }, point('t2', 2)],
+    places: [place('a', { phases: [{ id: 'a-l', timing: {}, x: 7.03, y: -4, images: [] }] }), place('b')],
+  }),
   'image-time': base({ persons: [person('p', { to: 't2' }), person('q')], facts: [], places: [place('a'), place('b')], groups: [] }),
   'image-missing': base({ persons: [{ ...person('p'), images: [{ id: 'i', file: 'images/p-iiii.png', order: 1 }] }, person('q')] }),
   'date-order': base({ timePoints: [{ ...point('t1', 1), date: { year: 5 } }, { ...point('t2', 2), date: { year: 3 } }] }),

@@ -1,8 +1,8 @@
 import type { Hint } from '../checks'
-import { bounds, factLabel, factTiming, findElement, spanLabel, worldPosition, type Book, type Fact, type Image, type Place, type Timing } from '../model'
+import { bounds, factLabel, factTiming, findElement, layerAt, spanLabel, worldPosition, type Book, type Fact, type Image, type Place, type Timing } from '../model'
 import { newId } from '../storage/format'
 import { calendarOf, fitDate, formatDate } from '../calendar'
-import { allIds, dateOf, removeFact, setDate, toTiming, type Recipe, type Span } from './ops'
+import { allIds, dateOf, removeElement, removeFact, setDate, toTiming, type Recipe, type Span } from './ops'
 
 /** Eine Lösung im Hinweis-Dialog; ohne `recipe` muss die Oberfläche ein Bild hochladen lassen */
 export interface Fix {
@@ -205,6 +205,27 @@ const PLANS: Record<Hint['rule'], (book: Book, hint: Hint) => FixPlan | undefine
           const phase = phaseIn(dr, found.place.id, phaseId!)
           Object.assign(phase, { x: round(phase.x * edge), y: round(phase.y * edge) })
         } },
+      ],
+      rows: [],
+    }
+  },
+
+  'outside-layer': (book, { ids: [phaseId], at }) => {
+    const found = phaseOwner(book, phaseId!)
+    const pos = found && worldPosition(book, found.place.id, at)
+    if (!found || !pos) return undefined
+    const rect = layerAt(book, at)
+    const clamp = (v: number, mid: number, size: number) => Math.min(mid + size / 2 - 0.1, Math.max(mid - size / 2 + 0.1, v))
+    const shift = (v: number, mid: number, size: number) => (Math.abs(v - mid) > size / 2 ? clamp(v, mid, size) - v : 0)
+    const dx = shift(pos.x, rect.x, rect.width)
+    const dy = shift(pos.y, rect.y, rect.height)
+    return {
+      fixes: [
+        { label: 'Auf den Rand der Ebene verschieben', preview: `${found.place.name} bei ${round(pos.x + dx)} / ${round(pos.y + dy)}`, recipe: (dr) => {
+          const phase = phaseIn(dr, found.place.id, phaseId!)
+          Object.assign(phase, { x: round(phase.x + dx), y: round(phase.y + dy) })
+        } },
+        { label: `${found.place.name} löschen`, preview: `${found.place.name} mit allen Aufenthalten und Reisen`, recipe: (dr) => removeElement(dr, found.place.id) },
       ],
       rows: [],
     }

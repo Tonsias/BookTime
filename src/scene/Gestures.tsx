@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Scope } from '../edit/ops'
-import { findElement, type Book } from '../model'
+import { findElement, layerAt, onLayer, type Book } from '../model'
 import { describeDrop, hitAt, positionOf, type DropKind, type Target } from './hits'
-import { LAYER_SIZE, ringRadius, type Layout, type NetPos } from './layout'
+import { ringRadius, type Layout, type NetPos } from './layout'
 
 /** Umrechnung zwischen Bildschirm und Netz einer Ebene, bereitgestellt aus der 3D-Szene */
 export interface Projector {
@@ -149,7 +149,7 @@ export function Gestures(props: GesturesProps) {
     const onDouble = (e: MouseEvent) => {
       if (!latest.current.enabled) return
       const point = net(e.clientX, e.clientY)
-      if (!point || Math.abs(point[0]) > LAYER_SIZE / 2 || Math.abs(point[1]) > LAYER_SIZE / 2) return
+      if (!point || !onLayer(layerAt(p().book, p().current), point[0], point[1])) return
       if (hitAt(p().book, p().layout, p().current, point, 'ring')) return
       p().onCreatePlace(point)
     }

@@ -37,7 +37,7 @@ const KINDS: Kind[] = [
   {
     key: 'timePoints',
     folder: 'time-points',
-    spec: { id: 'id', name: 'string', dateLabel: 'string?', date: DATE, order: 'number', background: { id: 'id', file: 'string', x: 'number', y: 'number', width: 'positive', note: 'string?' } },
+    spec: { id: 'id', name: 'string', dateLabel: 'string?', date: DATE, order: 'number', background: { id: 'id', file: 'string', x: 'number', y: 'number', width: 'positive', height: 'positive?', note: 'string?' } },
     texts: ['note'],
     names: ['name'],
   },

@@ -2,10 +2,10 @@ import { Component, memo, Suspense, useEffect, useMemo, useRef, useState, type C
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Edges, Line, useTexture } from '@react-three/drei'
 import { BufferGeometry, ConeGeometry, DoubleSide, OctahedronGeometry, Plane, Quaternion, Raycaster, RingGeometry, SphereGeometry, SRGBColorSpace, Vector2, Vector3 } from 'three'
-import { backgroundAt, covers, elementColor, factsAt, phaseAt, type Book, type TimePoint } from '../model'
+import { backgroundAt, covers, elementColor, factsAt, layerAt, phaseAt, type Book, type LayerRect, type TimePoint } from '../model'
 import type { Selection, View } from '../ui/types'
 import { Labels, type Label } from './Labels'
-import { LAYER_SIZE, SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
+import { SLICE_SPACING, ringRadius, slicePoint, strandSegments, type Layout, type NetPos } from './layout'
 import { Markers, type Marker } from './Markers'
 import type { Projector } from './Gestures'
 import { Segments, type Segment } from './Segments'
@@ -76,9 +76,10 @@ export function Scene(props: SceneProps) {
     onSelect({ kind, id })
   }
 
+  const rects = points.map((_, i) => layerAt(book, i))
   const labels: Label[] = visible.map((i) => ({
     key: `layer-${i}`,
-    position: new Vector3(i * SLICE_SPACING, LAYER_SIZE / 2 + 1, 0),
+    position: slicePoint(i, [rects[i]!.x, rects[i]!.y + rects[i]!.height / 2 + 1]),
     content: (
       <button type="button" className={`layer-label${i === current ? ' active' : ''}`} style={{ opacity: sliceOpacity(i) }} onClick={() => onJump(i)}>
         {i + 1}. {points[i]?.name}
@@ -115,18 +116,18 @@ export function Scene(props: SceneProps) {
       <color attach="background" args={['#0b0d12']} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[-10, 20, 15]} intensity={1.2} />
-      <CameraRig view={view} current={current} count={count} />
+      <CameraRig view={view} current={current} count={count} rect={layerAt(book, current)} />
       <ProjectorBridge onReady={onProjector} />
       <TimeClip enabled={view === 'netz'} x={current * SLICE_SPACING} />
 
       {visible.map((i) => (
-        <Layer key={i} index={i} active={i === current} opacity={sliceOpacity(i)} />
+        <Layer key={i} index={i} rect={rects[i]!} active={i === current} opacity={sliceOpacity(i)} />
       ))}
       {visible.map((i) => {
         const background = backgroundAt(book, i)
         if (!background || view === 'zeit' || (view === 'netz' && i !== current)) return null
-        const { file, x, y, width } = background
-        return <Backdrop key={i} file={file} imageUrl={imageUrl} position={slicePoint(i, [x, y])} width={width} opacity={i === current ? 0.4 : 0.12} />
+        const { x, y, width, height } = rects[i]!
+        return <Backdrop key={i} file={background.file} imageUrl={imageUrl} position={slicePoint(i, [x, y])} width={width} height={height} opacity={i === current ? 0.4 : 0.12} />
       })}
 
       {book.places.map((place) => (
@@ -218,7 +219,7 @@ const LayerContent = memo(function LayerContent({ book, layout, index: i, active
   )
 })
 
-function CameraRig({ view, current, count }: { view: View; current: number; count: number }) {
+function CameraRig({ view, current, count, rect }: { view: View; current: number; count: number; rect: LayerRect }) {
   const ref = useRef<ComponentRef<typeof CameraControls>>(null)
   const mid = ((count - 1) * SLICE_SPACING) / 2
   // Im Raum frei drehen lassen; nur die Netz-Ansicht folgt der aktuellen Ebene
@@ -228,11 +229,12 @@ function CameraRig({ view, current, count }: { view: View; current: number; coun
     const controls = ref.current
     if (!controls) return
     const x = current * SLICE_SPACING
-    if (view === 'netz') controls.setLookAt(x - 38, 0, 0, x, 0, 0, true)
+    const distance = (38 * Math.max(rect.width, rect.height)) / 22
+    if (view === 'netz') controls.setLookAt(x - distance, rect.y, rect.x, x, rect.y, rect.x, true)
     else if (view === 'zeit') controls.setLookAt(mid, 0, 58, mid, 0, 0, true)
     else controls.setLookAt(mid - 34, 20, 40, mid, 0, 0, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, follow, mid])
+  }, [view, follow, mid, rect.x, rect.y, rect.width, rect.height])
 
   return <CameraControls ref={ref} makeDefault />
 }
@@ -274,17 +276,17 @@ function TimeClip({ enabled, x }: { enabled: boolean; x: number }) {
   return null
 }
 
-function Layer({ index, active, opacity }: { index: number; active: boolean; opacity: number }) {
+function Layer({ index, rect, active, opacity }: { index: number; rect: LayerRect; active: boolean; opacity: number }) {
   return (
-    <mesh position={[index * SLICE_SPACING, 0, 0]} rotation={[0, Math.PI / 2, 0]} raycast={noRaycast}>
-      <planeGeometry args={[LAYER_SIZE, LAYER_SIZE]} />
+    <mesh position={slicePoint(index, [rect.x, rect.y])} rotation={[0, Math.PI / 2, 0]} raycast={noRaycast}>
+      <planeGeometry args={[rect.width, rect.height]} />
       <meshBasicMaterial color={active ? '#6b8cff' : '#ffffff'} transparent opacity={(active ? 0.07 : 0.025) * opacity} side={DoubleSide} depthWrite={false} />
       <Edges color={active ? '#6b8cff' : '#3a4152'} />
     </mesh>
   )
 }
 
-function Backdrop(props: { file: string; imageUrl: SceneProps['imageUrl']; position: Vector3; width: number; opacity: number }) {
+function Backdrop(props: { file: string; imageUrl: SceneProps['imageUrl']; position: Vector3; width: number; height: number; opacity: number }) {
   const { file, imageUrl } = props
   const [url, setUrl] = useState<string>()
   useEffect(() => {
@@ -309,14 +311,13 @@ class SkipOnError extends Component<{ children: ReactNode }, { failed: boolean }
   }
 }
 
-function BackdropPlane({ url, position, width, opacity }: { url: string; position: Vector3; width: number; opacity: number }) {
+function BackdropPlane({ url, position, width, height, opacity }: { url: string; position: Vector3; width: number; height: number; opacity: number }) {
   const texture = useTexture(url, (t) => {
     t.colorSpace = SRGBColorSpace
   })
-  const { width: w, height: h } = texture.image as { width: number; height: number }
   return (
     <mesh position={position} rotation={[0, -Math.PI / 2, 0]} renderOrder={-1} raycast={noRaycast}>
-      <planeGeometry args={[width, (width * h) / w]} />
+      <planeGeometry args={[width, height]} />
       <meshBasicMaterial map={texture} transparent opacity={opacity} side={DoubleSide} depthWrite={false} />
     </mesh>
   )

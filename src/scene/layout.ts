@@ -3,8 +3,6 @@ import { covers, factsAt, worldPosition, type Book, type Place } from '../model'
 
 /** Abstand zwischen zwei Zeitpunkt-Ebenen auf der Zeitachse */
 export const SLICE_SPACING = 8
-/** Kantenlänge einer Zeitpunkt-Ebene */
-export const LAYER_SIZE = 22
 
 const DEFAULT_RING = 2.1
 const PERSON_RADIUS = 1.3

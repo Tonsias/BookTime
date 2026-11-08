@@ -5,6 +5,7 @@ import type { Book } from '../model'
 import { imageUrls, rememberCopy, type ActiveBook } from '../storage/active'
 import { filesToBook, imagePath, newId, type LoadError } from '../storage/format'
 import type { Selection } from '../ui/types'
+import { backgroundSize } from './backgroundSize'
 import { allIds, produce, type Recipe } from './ops'
 import { gitBlobSha, saveBook } from './save'
 
@@ -140,6 +141,26 @@ export function useEditor(active: ActiveBook, onReloaded: () => void) {
     if (step) commit({ ...s, book: step.after, past: [...s.past, step], future: s.future.slice(0, -1) })
     return step
   }, [commit])
+
+  // Alte Dateien ohne Höhe des Hintergrunds: einmal aus dem Bild ergänzen, als normale Änderung
+  const measured = useRef(new Set<string>())
+  useEffect(() => {
+    for (const point of state.book.timePoints) {
+      const background = point.background
+      if (!background || background.height !== undefined || measured.current.has(background.id)) continue
+      measured.current.add(background.id)
+      imageUrl(background.file)
+        .then((url) => (url ? fetch(url).then((r) => r.blob()).then(backgroundSize) : undefined))
+        .then((size) => {
+          if (!size) return
+          apply('Höhe des Hintergrunds ergänzt', (d) => {
+            const target = d.timePoints.find((t) => t.background?.id === background.id)?.background
+            if (target && target.height === undefined) target.height = Math.round((target.width * size.height * 10) / size.width) / 10
+          }, { selection: null, current: 0 })
+        })
+        .catch(() => undefined)
+    }
+  }, [state.book, imageUrl, apply])
 
   /** Ergebnis einer Änderung ohne Verlauf, z. B. als Vorschau beim Ziehen */
   const preview = useCallback((recipe: Recipe) => {

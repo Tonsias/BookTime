@@ -2,15 +2,22 @@ import { useState } from 'react'
 import { Anchor, Badge, Button, Group, Modal, Stack, Switch, Text, UnstyledButton } from '@mantine/core'
 import { hintKey, hints as allHints } from '../../checks'
 import { allIds, byId, moveTimePoint, setText } from '../../edit/ops'
+import { backgroundSize } from '../../edit/backgroundSize'
 import { removeImage } from '../../edit/fixes'
 import type { Book, RelationType, TimePoint } from '../../model'
 import { filesToBook, newId } from '../../storage/format'
 import { sampleFiles } from '../../storage/sample'
-import { LAYER_SIZE } from '../../scene/layout'
 import { useUi } from '../context'
 import { Inline } from '../fields'
 import { PanelHeader } from './ElementPanel'
 import { BookImage, DateField, DeleteButton, DropZone, HintRows, NoteSection, NumberField, Row, Section, TextField } from './parts'
+
+function scaleBackground(target: TimePoint, width: number) {
+  const background = target.background!
+  const next = Math.max(1, width)
+  background.height = Math.round(((background.height ?? background.width) * next * 10) / background.width) / 10
+  background.width = next
+}
 
 /** Editor eines Zeitpunkts: Name, Datum, Reihenfolge, Hintergrund (Festlegung 38) */
 export function TimePointPanel({ point }: { point: TimePoint }) {
@@ -19,10 +26,10 @@ export function TimePointPanel({ point }: { point: TimePoint }) {
   const move = (to: number) => change(`${point.name} verschoben`, (d) => moveTimePoint(d, k, to)) && jump(to)
   const background = point.background
   const setBackground = async (file: File) => {
-    const path = await upload(file, point.name)
+    const [path, size] = await Promise.all([upload(file, point.name), backgroundSize(file)])
     change('Hintergrund gesetzt', (d) => {
       const target = byId<TimePoint>(d, point.id)
-      target.background = target.background ? { ...target.background, file: path } : { id: newId(allIds(d)), file: path, x: 0, y: 0, width: LAYER_SIZE }
+      target.background = target.background ? { ...target.background, file: path, ...size } : { id: newId(allIds(d)), file: path, x: 0, y: 0, ...size }
     })
   }
   return (
@@ -52,11 +59,14 @@ export function TimePointPanel({ point }: { point: TimePoint }) {
         {background ? (
           <Stack gap="xs">
             <BookImage file={background.file} alt={point.name} />
-            {(['x', 'y', 'width'] as const).map((field) => (
-              <Row key={field} label={{ x: 'X', y: 'Y', width: 'Breite' }[field]}>
-                <NumberField id={background.id} field={field} value={background[field]} label={{ x: 'X', y: 'Y', width: 'Breite' }[field]} min={field === 'width' ? 1 : undefined} />
+            {(['x', 'y'] as const).map((field) => (
+              <Row key={field} label={field.toUpperCase()}>
+                <NumberField id={background.id} field={field} value={background[field]} label={field.toUpperCase()} />
               </Row>
             ))}
+            <Row label="Breite">
+              <Inline field={`width:${background.id}`} value={String(background.width)} label="Breite" number onCommit={(v) => change('Breite geändert', (d) => scaleBackground(byId<TimePoint>(d, point.id), Number(v)))} />
+            </Row>
             <DropZone onFile={setBackground}>
               <Text size="xs" c="dimmed" ta="center">
                 Anderes Bild ablegen oder auswählen

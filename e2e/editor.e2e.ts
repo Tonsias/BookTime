@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { crc32, deflateSync } from 'node:zlib'
 import { drag, emptySpot, insideOf, open, panel, ready, saved, screenOf, search, settle } from './helpers'
 
 test.beforeEach(async ({ page }, info) => {
@@ -163,4 +164,39 @@ test('Bild hochladen bleibt nach dem Neuladen', async ({ page }) => {
   await ready(page)
   await search(page, 'Mira')
   await expect(panel(page).getByRole('img', { name: 'Mira', exact: true })).toBeVisible()
+})
+
+/** Einfarbiges PNG in beliebiger Größe */
+function png(width: number, height: number) {
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type), data])
+    const out = Buffer.alloc(body.length + 8)
+    out.writeUInt32BE(data.length, 0)
+    body.copy(out, 4)
+    out.writeUInt32BE(crc32(body), body.length + 4)
+    return out
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header[8] = 8
+  const rows = Buffer.alloc((width + 1) * height)
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(rows)), chunk('IEND', Buffer.alloc(0))])
+}
+
+test('Die Ebene übernimmt die Form eines hochgeladenen Hintergrunds', async ({ page }) => {
+  await page.keyboard.press('2')
+  await settle(page)
+  await page.getByRole('button', { name: 'Zeitpunkt bearbeiten' }).click()
+  await panel(page).getByTestId('image-input').setInputFiles({ name: 'kueste.png', mimeType: 'image/png', buffer: png(2000, 500) })
+  await expect(panel(page).getByRole('button', { name: 'Breite bearbeiten' })).toHaveText('40')
+  await settle(page)
+  const wide = await page.evaluate(() => window.__booktime!.net(18, 0))
+  await page.mouse.dblclick(wide!.x, wide!.y)
+  await expect(page.getByRole('textbox', { name: 'Name' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  expect(await page.evaluate(() => window.__booktime!.hit(0, 7))).toBeNull()
+  const above = await page.evaluate(() => window.__booktime!.net(0, 7))
+  await page.mouse.dblclick(above!.x, above!.y)
+  await expect(page.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
 })

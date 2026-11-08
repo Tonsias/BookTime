@@ -50,7 +50,7 @@ Ignore-Einträge) – das ist eine Entscheidung, die nachgefragt werden muss.
 ## Struktur
 
 - `src/model.ts` – Datenmodell nach `docs/2026-10-datenmodell.md` (Zeitpunkte, Personen, Gruppen, Orte,
-  Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`, `backgroundAt`)
+  Events, zeitliche Fakten) und Auswertung pro Zeitpunkt (`factsAt`, `worldPosition`, `imageAt`, `backgroundAt`, `layerAt`)
 - `src/calendar.ts` – Datum und eigener Kalender nach `docs/2026-11-kalender.md`: Umrechnung, Anzeige, Alter
 - `src/calendar/` – eigene Seite `kalender.html` zum Bearbeiten des Kalenders
 - `src/checks.ts` – Prüfungen nach Festlegung 14 des Datenmodells: Verbote (`problems`, beim Laden und Bearbeiten) und Hinweise (`hints`)

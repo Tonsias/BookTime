@@ -1,13 +1,14 @@
 /** Zeitpunkt (`at`) oder Zeitspanne; fehlendes from/to = Anfang/Ende der Geschichte, Grenzen eingeschlossen */
 export type Timing = { at: string } | { from?: string; to?: string }
 
-/** Hintergrundbild einer Zeitebene, Mittelpunkt und Breite in Weltkoordinaten */
+/** Hintergrundbild einer Zeitebene, Mittelpunkt und Größe in Weltkoordinaten; height fehlt nur in alten Dateien */
 interface Background {
   id: string
   file: string
   x: number
   y: number
   width: number
+  height?: number
   note?: string
 }
 
@@ -360,6 +361,28 @@ export const backgroundAt = (book: Book, i: number) =>
   timeline(book)
     .slice(0, i + 1)
     .findLast((t) => t.background)?.background
+
+/** Fläche einer Zeitebene in Weltkoordinaten, Mittelpunkt x/y */
+export interface LayerRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Kantenlänge der quadratischen Ebene in Büchern ohne Hintergrund */
+export const DEFAULT_LAYER = 22
+
+/** Fläche zum Index i: die des gültigen Hintergrunds, sonst des ersten späteren, sonst das Standardquadrat */
+export function layerAt(book: Book, i: number): LayerRect {
+  const background = backgroundAt(book, i) ?? timeline(book).slice(i + 1).find((t) => t.background)?.background
+  if (!background) return { x: 0, y: 0, width: DEFAULT_LAYER, height: DEFAULT_LAYER }
+  const { x, y, width, height = width } = background
+  return { x, y, width, height }
+}
+
+/** Liegt der Punkt auf der Fläche, Rand eingeschlossen */
+export const onLayer = (rect: LayerRect, x: number, y: number) => Math.abs(x - rect.x) <= rect.width / 2 && Math.abs(y - rect.y) <= rect.height / 2
 
 /** Alle Elemente, die mit der Auswahl irgendwann verbunden sind */
 export function focusSet(book: Book, id: string | null): Set<string> | null {

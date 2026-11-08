@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { backgroundAt, bounds, covers, factsAt, findElement, imageAt, phaseAt, placeChain, timeline, worldPosition, type Book } from './model'
+import { backgroundAt, bounds, covers, factsAt, findElement, imageAt, layerAt, phaseAt, placeChain, timeline, worldPosition, type Book } from './model'
 import { filesToBook } from './storage/format'
 import { sampleFiles } from './storage/sample'
 
@@ -50,6 +50,17 @@ describe('Orte und Bilder', () => {
   it('gibt einen Hintergrund an spätere Zeitpunkte weiter', () => {
     expect(backgroundAt(book, 0)?.file).toBe('images/ankunft-in-velmar-w4k2.svg')
     expect(backgroundAt(book, 4)).toBe(backgroundAt(book, 0))
+  })
+
+  it('gibt der Ebene die Fläche des gültigen, sonst des ersten späteren Hintergrunds', () => {
+    const [first, second] = timeline(book)
+    const wide = { id: 'wd', file: 'w.png', x: 2, y: 1, width: 30, height: 12 }
+    const later: Book = { ...book, timePoints: book.timePoints.map((t) => (t.id === first!.id ? { ...t, background: undefined } : t.id === second!.id ? { ...t, background: wide } : t)) }
+    expect(layerAt(later, 0)).toEqual({ x: 2, y: 1, width: 30, height: 12 })
+    expect(layerAt(later, 4)).toEqual({ x: 2, y: 1, width: 30, height: 12 })
+    const old: Book = { ...book, timePoints: book.timePoints.map((t) => (t.background ? { ...t, background: { ...t.background, width: 10, height: undefined } } : t)) }
+    expect(layerAt(old, 0)).toEqual({ x: 0, y: 0, width: 10, height: 10 })
+    expect(layerAt({ ...book, timePoints: book.timePoints.map((t) => ({ ...t, background: undefined })) }, 2)).toEqual({ x: 0, y: 0, width: 22, height: 22 })
   })
 
   it('wählt das erste zum Zeitpunkt gültige Bild', () => {
