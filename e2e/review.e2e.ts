@@ -91,3 +91,9 @@ test('Suche verliert beim sofortigen Tippen keinen Buchstaben', async ({ page })
   await page.keyboard.type('Anna')
   await expect(page.getByPlaceholder(/Person, Gruppe, Ort/)).toHaveValue('Anna')
 })
+
+test('Klick auf eine Ebene springt dorthin und zeigt den Zeitpunkt rechts', async ({ page }) => {
+  await page.getByRole('button', { name: /^2\. / }).click()
+  await expect(page.getByRole('button', { name: 'Zeitpunkt bearbeiten' })).toHaveText(/^2\. /)
+  await expect(panel(page)).toContainText('Zeitpunkt 2')
+})

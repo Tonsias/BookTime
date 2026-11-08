@@ -81,7 +81,7 @@ export function Scene(props: SceneProps) {
     key: `layer-${i}`,
     position: slicePoint(i, [rects[i]!.x, rects[i]!.y + rects[i]!.height / 2 + 1]),
     content: (
-      <button type="button" className={`layer-label${i === current ? ' active' : ''}`} style={{ opacity: sliceOpacity(i) }} onClick={() => onJump(i)}>
+      <button type="button" className={`layer-label${i === current ? ' active' : ''}`} style={{ opacity: sliceOpacity(i) }} onClick={() => (onJump(i), onSelect({ kind: 'timePoint', id: points[i]!.id }))}>
         {i + 1}. {points[i]?.name}
       </button>
     ),
