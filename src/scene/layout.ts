@@ -5,8 +5,6 @@ import { covers, factsAt, worldPosition, type Book, type Place } from '../model'
 export const SLICE_SPACING = 8
 
 const DEFAULT_RING = 2.1
-const PERSON_RADIUS = 1.3
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5))
 /** Wie lange ein Strang an einer Ebene gerade bleibt, bevor er sich zur nächsten biegt */
 const HOLD = SLICE_SPACING * 0.3
 
@@ -28,7 +26,7 @@ export interface Layout {
   persons: Map<string, Track>
 }
 
-/** Orte an ihrer Weltposition; Personen um ihren Ort bzw. auf halber Strecke ihrer Reise */
+/** Orte an ihrer Weltposition; Personen gleichmäßig um ihren Ort bzw. auf halber Strecke ihrer Reise */
 export function computeLayout(book: Book, count: number): Layout {
   const slices = Array.from({ length: count }, (_, i) => i)
   const places = new Map<string, Track>()
@@ -43,28 +41,30 @@ export function computeLayout(book: Book, count: number): Layout {
   }
 
   const facts = slices.map((i) => factsAt(book, i))
-  const persons = new Map<string, Track>()
-  const byId = [...book.persons].sort((a, b) => a.id.localeCompare(b.id))
-  byId.forEach((person, n) => {
-    // Feste Ablage um den Ort nach ID-Reihenfolge (die Liste ändert sich beim Neuladen), Stränge springen nur bei echten Änderungen
-    const angle = n * GOLDEN_ANGLE
-    persons.set(
-      person.id,
-      slices.map((i) => {
-        const at = (id: string) => places.get(id)?.[i]
-        const stay = facts[i]?.find((f) => f.kind === 'stay' && f.person === person.id)
-        if (stay?.kind === 'stay') {
-          const center = at(stay.place)
-          const ring = ringRadius(book.places.find((p) => p.id === stay.place)!)
-          const r = Math.min(PERSON_RADIUS, ring * 0.6)
-          return center ? [center[0] + Math.cos(angle) * r, center[1] + Math.sin(angle) * r] : null
-        }
-        const journey = facts[i]?.find((f) => f.kind === 'journey' && f.person === person.id)
-        if (journey?.kind !== 'journey') return null
-        const [a, b] = [at(journey.origin), at(journey.destination)]
-        return a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null
-      }),
-    )
+  const persons = new Map<string, Track>(book.persons.map((person) => [person.id, slices.map(() => null)]))
+  slices.forEach((i) => {
+    const at = (id: string) => places.get(id)?.[i]
+    const residents = new Map<string, string[]>()
+    for (const fact of facts[i] ?? []) {
+      if (fact.kind === 'stay') residents.set(fact.place, [...(residents.get(fact.place) ?? []), fact.person])
+      if (fact.kind !== 'journey') continue
+      const [a, b] = [at(fact.origin), at(fact.destination)]
+      const track = persons.get(fact.person)
+      if (a && b && track) track[i] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+    }
+    // Gleichmäßig um den Ort nach ID-Reihenfolge, damit sich niemand überdeckt
+    for (const [placeId, ids] of residents) {
+      const center = at(placeId)
+      const place = book.places.find((p) => p.id === placeId)
+      if (!center || !place) continue
+      const r = ringRadius(place) * 0.6
+      ids.sort((a, b) => a.localeCompare(b))
+      ids.forEach((id, n) => {
+        const angle = Math.PI / 2 + (n * 2 * Math.PI) / ids.length
+        const track = persons.get(id)
+        if (track) track[i] = [center[0] + Math.cos(angle) * r, center[1] + Math.sin(angle) * r]
+      })
+    }
   })
 
   return { places, persons }
