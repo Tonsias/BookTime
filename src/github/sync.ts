@@ -121,7 +121,8 @@ export async function commitLocal(copy: WorkingCopy, message: string) {
   return next
 }
 
-const finish = async (copy: WorkingCopy, branch: string, head: string) => {
+const finish = async (gh: GitHub, copy: WorkingCopy, branch: string, head: string) => {
+  const [latest] = await gh.pulls(branch)
   const next: WorkingCopy = {
     ...copy,
     branch,
@@ -130,7 +131,7 @@ const finish = async (copy: WorkingCopy, branch: string, head: string) => {
     images: committedImages(copy),
     commits: [],
     pushing: undefined,
-    pullUrl: branch === copy.branch ? copy.pullUrl : undefined,
+    pullUrl: latest?.state === 'open' ? latest.html_url : undefined,
     ahead: true,
   }
   await copies.put(next)
@@ -140,7 +141,7 @@ const finish = async (copy: WorkingCopy, branch: string, head: string) => {
 /** Überträgt die lokalen Commits (bei Vorlauf auf GitHub auf einen neuen Branch), schließt abgebrochene Pushes ab */
 export async function push(token: string, copy: WorkingCopy) {
   const gh = new GitHub(token, copy.repo)
-  if (copy.pushing && (await gh.branchSha(copy.pushing.branch)) === copy.pushing.head) return finish(copy, copy.pushing.branch, copy.pushing.head)
+  if (copy.pushing && (await gh.branchSha(copy.pushing.branch)) === copy.pushing.head) return finish(gh, copy, copy.pushing.branch, copy.pushing.head)
   let branch = copy.branch
   const remote = await gh.branchSha(branch)
   if (remote !== copy.head) {
@@ -167,7 +168,7 @@ export async function push(token: string, copy: WorkingCopy) {
   }
   await copies.put({ ...copy, pushing: { branch, head } })
   await gh.setBranch(branch, head, 'update')
-  return finish(copy, branch, head)
+  return finish(gh, copy, branch, head)
 }
 
 /** Erstellt einen Pull Request vom Arbeitsbranch in den Standardbranch */

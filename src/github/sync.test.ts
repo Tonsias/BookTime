@@ -182,6 +182,17 @@ describe('GitHub-Abläufe', () => {
     expect(copy.base['booktime.note.md']).toBe('Neu\n')
   })
 
+  it('bietet nach einem Push auf einen gemergten Branch wieder einen Pull Request an', async () => {
+    let copy = await load('token', 'o/buch')
+    copy = await push('token', await commitLocal({ ...copy, files: { ...copy.files, 'booktime.note.md': 'Neu\n' } }, 'Notiz'))
+    copy = await openPull('token', copy)
+    github.merge(1)
+    copy = await push('token', await commitLocal({ ...copy, files: { ...copy.files, 'booktime.note.md': 'Mehr\n' } }, 'Mehr'))
+    expect(copy.pullUrl).toBeUndefined()
+    copy = await openPull('token', copy)
+    expect(copy.pullUrl).toBe('https://github.com/o/buch/pull/2')
+  })
+
   it('kehrt nach dem Merge eines Ausweichbranches zum Arbeitsbranch zurück', async () => {
     let copy = await load('token', 'o/buch')
     github.refs.set(copy.branch, github.addCommit(github.files(copy.head), [copy.head]))
